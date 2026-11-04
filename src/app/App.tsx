@@ -1,8 +1,19 @@
+import { ExplorerProvider } from './providers/ExplorerProvider'
+import { ProgressHeader } from '../features/onboarding-progress/components/ProgressHeader'
+import { OfficeMapCanvas } from '../features/map-navigation/components/OfficeMapCanvas'
+import { QuestModal } from '../features/algorithmic-quest/components/QuestModal'
+import { RoomModal } from '../features/room-inspector/components/RoomModal'
+
 export function App() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-      <h1 className="text-2xl font-bold">Xsolla School — Interactive Office Explorer</h1>
-    </div>
+    <ExplorerProvider>
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0d0d1a] text-slate-100">
+        <ProgressHeader />
+        <OfficeMapCanvas />
+        <QuestModal />
+        <RoomModal />
+      </div>
+    </ExplorerProvider>
   )
 }
 

@@ -1,1 +1,18 @@
 @import "tailwindcss";
+
+@keyframes roomDiveIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.78);
+    filter: blur(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0px);
+  }
+}
+
+.animate-room-dive-in {
+  animation: roomDiveIn 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
