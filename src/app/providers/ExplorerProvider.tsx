@@ -25,10 +25,11 @@ interface ExplorerContextValue {
   error: string | null
   selectedQuestZoneId: string | null
   selectedRoomZoneId: string | null
+  selectedSceneId: string | null
   activeMapHotspot: HotspotDTO | null
   openQuestModal: (zoneId: string) => void
   closeQuestModal: () => void
-  openRoomModal: (zoneId: string) => void
+  openRoomModal: (zoneId: string, sceneId?: string) => void
   closeRoomModal: () => void
   openMapHotspot: (hotspot: HotspotDTO) => void
   closeMapHotspot: () => void
@@ -49,6 +50,7 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
 
   const [selectedQuestZoneId, setSelectedQuestZoneId] = useState<string | null>(null)
   const [selectedRoomZoneId, setSelectedRoomZoneId] = useState<string | null>(null)
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null)
   const [activeMapHotspot, setActiveMapHotspot] = useState<HotspotDTO | null>(null)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
@@ -148,11 +150,18 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
       error,
       selectedQuestZoneId,
       selectedRoomZoneId,
+      selectedSceneId,
       activeMapHotspot,
       openQuestModal: (zoneId: string) => setSelectedQuestZoneId(zoneId),
       closeQuestModal: () => setSelectedQuestZoneId(null),
-      openRoomModal: (zoneId: string) => setSelectedRoomZoneId(zoneId),
-      closeRoomModal: () => setSelectedRoomZoneId(null),
+      openRoomModal: (zoneId: string, sceneId?: string) => {
+        setSelectedRoomZoneId(zoneId)
+        setSelectedSceneId(sceneId || null)
+      },
+      closeRoomModal: () => {
+        setSelectedRoomZoneId(null)
+        setSelectedSceneId(null)
+      },
       openMapHotspot: (hotspot: HotspotDTO) => setActiveMapHotspot(hotspot),
       closeMapHotspot: () => setActiveMapHotspot(null),
       handleZoneUnlocked,
@@ -169,6 +178,7 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
       error,
       selectedQuestZoneId,
       selectedRoomZoneId,
+      selectedSceneId,
       activeMapHotspot,
       handleZoneUnlocked,
       handleEggClaimed,

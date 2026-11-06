@@ -9,6 +9,13 @@ export type HotspotCategory =
   | 'PROJECTOR'
   | 'VIEWPOINT'
   | 'EASTER_EGG'
+  | 'MONITOR'
+  | 'DESK'
+  | 'MEDKIT'
+  | 'ELEVATOR'
+  | 'BAR'
+  | 'CABINE'
+  | 'STOCK'
 
 export interface APIError {
   code: string
