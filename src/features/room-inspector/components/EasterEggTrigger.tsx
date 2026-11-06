@@ -1,5 +1,6 @@
-import { Sparkles, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
 import type { HotspotDTO } from '../../../shared/types/api.types'
+import { XsollaEmblem } from '../../../shared/ui/XsollaLogo'
 
 interface EasterEggTriggerProps {
   hotspot: HotspotDTO
@@ -16,22 +17,26 @@ export function EasterEggTrigger({
     <button
       type="button"
       disabled={hotspot.is_claimed || isClaiming}
-      onClick={() => onClaim(hotspot.id)}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClaim(hotspot.id)
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
       style={{
         left: `${hotspot.x_percent}%`,
         top: `${hotspot.y_percent}%`,
       }}
-      title={hotspot.is_claimed ? `${hotspot.title} (Claimed)` : 'Hidden Xsolla Logo!'}
-      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full p-2 transition-all duration-300 ${
+      title={hotspot.is_claimed ? `${hotspot.title} (Claimed)` : 'Hidden Xsolla emblem! Click to collect'}
+      className={`absolute -translate-x-1/2 -translate-y-1/2 z-30 flex items-center justify-center rounded-full transition-all duration-300 ${
         hotspot.is_claimed
-          ? 'bg-amber-500/30 border border-amber-400 text-amber-300 opacity-90 cursor-default'
-          : 'bg-indigo-500/15 border border-white/15 text-indigo-300 opacity-30 hover:opacity-100 hover:scale-125 hover:bg-amber-500/30 hover:border-amber-400 hover:text-amber-300 cursor-pointer'
+          ? 'h-9 w-9 border border-[#80EAFF]/70 bg-[#153640] text-[#80EAFF] cursor-default'
+          : 'h-8 w-8 text-[#80EAFF] opacity-35 hover:opacity-100 hover:scale-125 hover:drop-shadow-[0_0_14px_rgba(128,234,255,0.9)] cursor-pointer'
       }`}
     >
       {hotspot.is_claimed ? (
         <Check className="h-4 w-4" />
       ) : (
-        <Sparkles className="h-4 w-4" />
+        <XsollaEmblem className="h-full w-full" />
       )}
     </button>
   )

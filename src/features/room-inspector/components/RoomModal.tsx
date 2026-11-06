@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import {
   ArrowLeft,
   ChevronLeft,
@@ -7,6 +7,8 @@ import {
   Crosshair,
   Images,
   Info,
+  Maximize2,
+  Minimize2,
   Pause,
   Play,
   RotateCw,
@@ -17,9 +19,14 @@ import {
 import { Modal } from '../../../shared/ui/Modal'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
 import type { HotspotDTO } from '../../../shared/types/api.types'
-import { resolveRoomScenes } from '../../../shared/constants/roomScenes'
+import {
+  EXTERNAL_INTEGRATION_URLS,
+  resolveRoomScenes,
+  type StreetViewLink,
+} from '../../../shared/constants/roomScenes'
 import { EquipmentHotspot } from './EquipmentHotspot'
 import { EasterEggTrigger } from './EasterEggTrigger'
+import { StreetViewArrow } from './StreetViewArrow'
 import { useEasterEgg } from '../hooks/useEasterEgg'
 
 function getRoomAtmosphereGradient(zoneId: string): string {
@@ -41,7 +48,11 @@ function getRoomAtmosphereGradient(zoneId: string): string {
 export function RoomModal() {
   const {
     zones,
+    progress,
     selectedRoomZoneId,
+    selectedSceneId,
+    openRoomModal,
+    openQuestModal,
     closeRoomModal,
     activeMapHotspot,
     closeMapHotspot,
@@ -50,7 +61,9 @@ export function RoomModal() {
 
   const [activeSceneIndex, setActiveSceneIndex] = useState<number>(0)
   const [selectedHotspot, setSelectedHotspot] = useState<HotspotDTO | null>(null)
+  const [systemModalHotspot, setSystemModalHotspot] = useState<HotspotDTO | null>(null)
   const [failedUrls, setFailedUrls] = useState<Record<string, boolean>>({})
+  const [isWalking, setIsWalking] = useState<boolean>(false)
 
   const [yawDeg, setYawDeg] = useState<number>(0)
   const [pitchDeg, setPitchDeg] = useState<number>(0)
@@ -58,6 +71,7 @@ export function RoomModal() {
   const [autoRotate, setAutoRotate] = useState<boolean>(false)
   const [isDragging, setIsDragging] = useState<boolean>(false)
   const [calibrateMode, setCalibrateMode] = useState<boolean>(false)
+  const [immersive, setImmersive] = useState<boolean>(false)
   const [cursorCoords, setCursorCoords] = useState<{ x: number; y: number } | null>(
     null,
   )
@@ -72,14 +86,48 @@ export function RoomModal() {
 
   const zone = selectedRoomZoneId ? zones[selectedRoomZoneId] : null
 
+  const exitImmersive = useCallback(() => {
+    setImmersive(false)
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined)
+    }
+  }, [])
+
+  const enterImmersive = () => {
+    setImmersive(true)
+    void document.documentElement.requestFullscreen?.().catch(() => undefined)
+  }
+
   useEffect(() => {
-    setActiveSceneIndex(0)
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) setImmersive(false)
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
+  useEffect(() => {
+    if (!zone && immersive) exitImmersive()
+  }, [zone, immersive, exitImmersive])
+
+  useEffect(() => {
+    if (!zone) {
+      setActiveSceneIndex(0)
+      return
+    }
+    const zoneScenes = resolveRoomScenes(zone.id, zone.media_url, zone.hotspots)
+    if (selectedSceneId) {
+      const idx = zoneScenes.findIndex((s) => s.id === selectedSceneId)
+      setActiveSceneIndex(idx >= 0 ? idx : 0)
+    } else {
+      setActiveSceneIndex(0)
+    }
     setSelectedHotspot(null)
     setYawDeg(0)
     setPitchDeg(0)
     setFovZoom(1)
     setAutoRotate(false)
-  }, [selectedRoomZoneId])
+  }, [zone, selectedRoomZoneId, selectedSceneId])
 
   useEffect(() => {
     setSelectedHotspot(null)
@@ -100,6 +148,10 @@ export function RoomModal() {
     if (!zone) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (immersive) {
+          exitImmersive()
+          return
+        }
         closeRoomModal()
       } else if (e.key === 'ArrowLeft') {
         setYawDeg((prev) => (prev - 12 + 360) % 360)
@@ -113,7 +165,7 @@ export function RoomModal() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [zone, closeRoomModal])
+  }, [zone, closeRoomModal, immersive, exitImmersive])
 
   if (activeMapHotspot && !zone) {
     return (
@@ -121,11 +173,15 @@ export function RoomModal() {
         isOpen={Boolean(activeMapHotspot)}
         onClose={closeMapHotspot}
         title={activeMapHotspot.title}
-        subtitle={`Category: ${activeMapHotspot.category.replace('_', ' ')}`}
+        subtitle={
+          activeMapHotspot.id.startsWith('info_')
+            ? 'Room info'
+            : `Category: ${activeMapHotspot.category.replace('_', ' ')}`
+        }
         maxWidthClass="max-w-lg"
       >
-        <div className="rounded-xl border border-indigo-500/25 bg-[#121224] p-5 text-left">
-          <p className="text-sm text-slate-200 whitespace-pre-line leading-relaxed">
+        <div className="rounded-lg border border-[#2F4045] bg-[#1B2628] p-5 text-left">
+          <p className="text-sm text-white whitespace-pre-line leading-relaxed">
             {activeMapHotspot.content}
           </p>
         </div>
@@ -142,10 +198,55 @@ export function RoomModal() {
   const isImageBroken = Boolean(failedUrls[currentUrl])
   const is360Mode = currentScene.is360 !== false
 
-  const sceneEquipment = currentScene.hotspots || []
-  const easterEggs =
-    safeIndex === 0 ? zone.hotspots.filter((h) => h.category === 'EASTER_EGG') : []
+  const allSceneHotspots = currentScene.hotspots || []
+  const sceneEquipment = allSceneHotspots.filter((h) => h.category !== 'EASTER_EGG')
+  const easterEggs = allSceneHotspots
+    .filter((h) => h.category === 'EASTER_EGG')
+    .map((h) => ({
+      ...h,
+      is_claimed: Boolean(progress?.found_egg_ids?.includes(h.id)),
+    }))
+  const sceneLinks = currentScene.links || []
   const atmosphereClass = getRoomAtmosphereGradient(zone.id)
+
+  const handleOpenSystemModal = (hotspot: HotspotDTO) => {
+    if (
+      hotspot.category === 'MONITOR' &&
+      EXTERNAL_INTEGRATION_URLS.WEEKLY_SCHEDULE_URL
+    ) {
+      window.open(EXTERNAL_INTEGRATION_URLS.WEEKLY_SCHEDULE_URL, '_blank')
+      return
+    }
+    if (hotspot.category === 'DESK' && EXTERNAL_INTEGRATION_URLS.LMS_TASKS_URL) {
+      window.open(EXTERNAL_INTEGRATION_URLS.LMS_TASKS_URL, '_blank')
+      return
+    }
+    setSystemModalHotspot(hotspot)
+  }
+
+  const handleNavigateLink = (link: StreetViewLink) => {
+    const targetZone = zones[link.targetZoneId]
+    if (targetZone && targetZone.status === 'LOCKED') {
+      openQuestModal(link.targetZoneId)
+      return
+    }
+
+    setIsWalking(true)
+    window.setTimeout(() => {
+      if (link.targetZoneId === zone.id && link.targetSceneId) {
+        const nextIdx = scenes.findIndex((s) => s.id === link.targetSceneId)
+        if (nextIdx >= 0) {
+          setActiveSceneIndex(nextIdx)
+        }
+      } else {
+        openRoomModal(link.targetZoneId, link.targetSceneId)
+      }
+      if (typeof link.targetYaw === 'number') {
+        setYawDeg(link.targetYaw)
+      }
+      setIsWalking(false)
+    }, 300)
+  }
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true)
@@ -158,16 +259,6 @@ export function RoomModal() {
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (calibrateMode && stageRef.current) {
-      const rect = stageRef.current.getBoundingClientRect()
-      const xPct = ((e.clientX - rect.left) / rect.width) * 100
-      const yPct = ((e.clientY - rect.top) / rect.height) * 100
-      setCursorCoords({
-        x: Math.max(0, Math.min(100, Number(xPct.toFixed(1)))),
-        y: Math.max(0, Math.min(100, Number(yPct.toFixed(1)))),
-      })
-    }
-
     if (!isDragging || !is360Mode) return
     const dx = e.clientX - dragStart.current.x
     const dy = e.clientY - dragStart.current.y
@@ -175,6 +266,17 @@ export function RoomModal() {
     const nextPitch = Math.max(-20, Math.min(20, dragStart.current.pitch + dy * 0.08))
     setYawDeg(nextYaw)
     setPitchDeg(nextPitch)
+  }
+
+  const handleTileMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!calibrateMode) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100
+    const yPct = ((e.clientY - rect.top) / rect.height) * 100
+    setCursorCoords({
+      x: Math.max(0, Math.min(100, Number(xPct.toFixed(1)))),
+      y: Math.max(0, Math.min(100, Number(yPct.toFixed(1)))),
+    })
   }
 
   const handleMouseUp = () => {
@@ -187,16 +289,11 @@ export function RoomModal() {
   }
 
   const normalizedYaw = ((yawDeg % 360) + 360) % 360
-  const shiftPercent = is360Mode ? (normalizedYaw / 360) * 100 : 0
-
-  const computeWrappedX = (originalXPercent: number): number => {
-    if (!is360Mode) return originalXPercent
-    const shifted = originalXPercent - shiftPercent
-    return (shifted + 100) % 100
-  }
+  const shiftInTile = (((normalizedYaw / 360) + 0.3) % 1 + 1) % 1
+  const trackShiftPercent = shiftInTile * 50
 
   return (
-    <div className="fixed inset-0 top-[65px] z-40 flex flex-col bg-[#070712] animate-room-dive-in select-none overflow-hidden">
+    <div className={`fixed inset-0 flex flex-col bg-[#0F1719] animate-room-dive-in select-none overflow-hidden ${immersive ? 'top-0 z-[60]' : 'top-[65px] z-40'}`}>
       <img
         key={currentUrl}
         src={currentUrl}
@@ -218,46 +315,46 @@ export function RoomModal() {
         }
       />
 
-      <div className="absolute top-5 left-6 right-6 z-30 flex flex-wrap items-center justify-between gap-4 pointer-events-none">
+      <div className={`absolute top-5 left-6 right-6 z-30 flex flex-wrap items-center justify-between gap-4 pointer-events-none ${immersive ? 'hidden' : ''}`}>
         <div className="flex flex-wrap items-center gap-3 pointer-events-auto">
           <button
             type="button"
             onClick={closeRoomModal}
-            className="flex items-center gap-2 rounded-xl border border-indigo-400/40 bg-[#121228]/90 px-4 py-2.5 text-xs font-bold text-white shadow-xl backdrop-blur-md hover:bg-indigo-600 hover:border-indigo-400 transition-all cursor-pointer"
+            className="flex items-center gap-2 rounded-[6px] bg-[#80EAFF] px-4 py-2.5 text-xs font-bold text-[#0D1A1D] shadow-md hover:bg-[#A6F1FF] transition-all cursor-pointer"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 stroke-[2.5]" />
             Back to 31st-Floor Map
           </button>
 
-          <div className="rounded-xl border border-white/10 bg-[#121228]/90 px-4 py-2 backdrop-blur-md shadow-xl text-left">
+          <div className="rounded-lg border border-[#2F4045] bg-[#233134]/95 px-4 py-2 shadow-md text-left backdrop-blur-md">
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-[#80EAFF]" />
               <h2 className="text-sm font-bold text-white">{zone.name}</h2>
-              <span className="rounded-md bg-indigo-500/20 border border-indigo-400/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+              <span className="rounded-[4px] bg-[#153640] border border-[#80EAFF]/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#80EAFF]">
                 {is360Mode ? '360° Panorama' : 'Room Photo'}
               </span>
             </div>
           </div>
 
           {scenes.length > 1 && (
-            <div className="flex items-center gap-1 rounded-xl border border-indigo-400/30 bg-[#121228]/90 p-1 backdrop-blur-md shadow-xl">
+            <div className="flex items-center gap-1 rounded-lg border border-[#2F4045] bg-[#233134]/95 p-1 shadow-md backdrop-blur-md">
               <button
                 type="button"
                 onClick={() =>
                   setActiveSceneIndex((i) => (i - 1 + scenes.length) % scenes.length)
                 }
-                className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10 hover:text-white transition"
+                className="rounded-[4px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
                 title="Previous Photo"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="px-2 text-xs font-bold text-indigo-300">
+              <span className="px-2 text-xs font-bold text-white">
                 {safeIndex + 1} / {scenes.length}
               </span>
               <button
                 type="button"
                 onClick={() => setActiveSceneIndex((i) => (i + 1) % scenes.length)}
-                className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10 hover:text-white transition"
+                className="rounded-[4px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
                 title="Next Photo"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -266,21 +363,21 @@ export function RoomModal() {
           )}
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/10 bg-[#121228]/90 px-3.5 py-2 text-xs text-slate-200 backdrop-blur-md shadow-xl">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-[#2F4045] bg-[#233134]/95 px-3.5 py-2 text-xs text-white shadow-md backdrop-blur-md">
           {is360Mode && (
             <>
-              <Compass className="h-4 w-4 text-indigo-400" />
-              <span className="font-mono text-[11px] font-bold text-indigo-300 w-10">
+              <Compass className="h-4 w-4 text-[#80EAFF]" />
+              <span className="font-mono text-[11px] font-bold text-white w-10">
                 {Math.round(normalizedYaw)}°
               </span>
 
               <button
                 type="button"
                 onClick={() => setAutoRotate((v) => !v)}
-                className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition ${
+                className={`flex items-center gap-1 rounded-[6px] px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
                   autoRotate
-                    ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-300'
-                    : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                    ? 'bg-[#80EAFF] text-[#0D1A1D]'
+                    : 'bg-[#2F4045] text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D]'
                 }`}
               >
                 {autoRotate ? (
@@ -298,7 +395,7 @@ export function RoomModal() {
             onClick={() =>
               setFovZoom((z) => Math.min(2.1, Number((z + 0.2).toFixed(2))))
             }
-            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10"
+            className="rounded-[6px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
             title="Zoom In"
           >
             <ZoomIn className="h-3.5 w-3.5" />
@@ -309,7 +406,7 @@ export function RoomModal() {
             onClick={() =>
               setFovZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))
             }
-            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10"
+            className="rounded-[6px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
             title="Zoom Out"
           >
             <ZoomOut className="h-3.5 w-3.5" />
@@ -322,7 +419,7 @@ export function RoomModal() {
               setPitchDeg(0)
               setFovZoom(1)
             }}
-            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10"
+            className="rounded-[6px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
             title="Reset View"
           >
             <RotateCw className="h-3.5 w-3.5" />
@@ -330,11 +427,20 @@ export function RoomModal() {
 
           <button
             type="button"
+            onClick={enterImmersive}
+            className="rounded-[6px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
+            title="Full screen"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            type="button"
             onClick={() => setCalibrateMode((v) => !v)}
-            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition ${
+            className={`flex items-center gap-1 rounded-[6px] px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
               calibrateMode
-                ? 'border-amber-400/60 bg-amber-500/20 text-amber-300'
-                : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                ? 'bg-[#80EAFF] text-[#0D1A1D]'
+                : 'bg-[#2F4045] text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D]'
             }`}
             title="Show cursor X/Y % coordinates for placing new equipment pins"
           >
@@ -345,6 +451,17 @@ export function RoomModal() {
           </button>
         </div>
       </div>
+
+      {immersive && (
+        <button
+          type="button"
+          onClick={exitImmersive}
+          title="Exit full screen"
+          className="absolute top-4 right-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/80 backdrop-blur-sm hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
+        >
+          <Minimize2 className="h-4 w-4" />
+        </button>
+      )}
 
       <div
         ref={stageRef}
@@ -362,66 +479,104 @@ export function RoomModal() {
         }`}
       >
         {!isImageBroken ? (
-          <div
-            style={
-              is360Mode
-                ? {
-                    transform: `scale(${fovZoom}) translateY(${pitchDeg * 4}px)`,
-                    backgroundImage: `url("${currentUrl}")`,
-                    backgroundRepeat: 'repeat-x',
-                    backgroundSize: '200% 100%',
-                    backgroundPosition: `${-normalizedYaw * 0.55}% center`,
-                  }
-                : {
-                    transform: `scale(${fovZoom})`,
-                    backgroundImage: `url("${currentUrl}")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }
-            }
-            className="relative h-full w-full transition-transform duration-75 ease-out"
-          >
-            <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_90px_rgba(7,7,18,0.7)]" />
+          is360Mode ? (
+            <div
+              style={{
+                transform: `scale(${isWalking ? fovZoom * 1.38 : fovZoom}) translateY(${pitchDeg * 3.2}px)`,
+              }}
+              className={`relative -top-[8%] h-[116%] w-full ${
+                isWalking
+                  ? 'transition-all duration-300 ease-in opacity-45 blur-[2px]'
+                  : 'transition-opacity duration-200'
+              }`}
+            >
+              <div
+                style={{
+                  transform: `translate3d(-${trackShiftPercent}%, 0, 0)`,
+                }}
+                className="flex h-full w-[500%] will-change-transform"
+              >
+                {[0, 1].map((tileIdx) => (
+                  <div
+                    key={tileIdx}
+                    onMouseMove={handleTileMouseMove}
+                    style={{
+                      backgroundImage: `url("${currentUrl}")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '100% 100%',
+                      backgroundPosition: 'center',
+                    }}
+                    className="relative h-full w-1/2 shrink-0"
+                  >
+                    {sceneEquipment.map((hotspot) => (
+                      <EquipmentHotspot
+                        key={`${tileIdx}_${hotspot.id}`}
+                        hotspot={hotspot}
+                        compact={immersive}
+                        isActive={selectedHotspot?.id === hotspot.id}
+                        onSelect={setSelectedHotspot}
+                        onOpenSystemModal={handleOpenSystemModal}
+                      />
+                    ))}
 
-            {sceneEquipment.map((hotspot) => {
-              const wrappedHotspot: HotspotDTO = {
-                ...hotspot,
-                x_percent: computeWrappedX(hotspot.x_percent),
-                y_percent: Math.max(
-                  12,
-                  Math.min(88, hotspot.y_percent + (is360Mode ? pitchDeg * 0.4 : 0)),
-                ),
-              }
-              return (
+                    {sceneLinks.map((link) => (
+                      <StreetViewArrow
+                        key={`${tileIdx}_${link.id}`}
+                        link={link}
+                        compact={immersive}
+                        isLocked={zones[link.targetZoneId]?.status === 'LOCKED'}
+                        onNavigate={handleNavigateLink}
+                      />
+                    ))}
+
+                    {easterEggs.map((egg) => (
+                      <EasterEggTrigger
+                        key={`${tileIdx}_${egg.id}`}
+                        hotspot={egg}
+                        onClaim={(id) => void claimEgg(id)}
+                        isClaiming={claimingId === egg.id}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_90px_rgba(7,7,18,0.7)]" />
+            </div>
+          ) : (
+            <div
+              onMouseMove={handleTileMouseMove}
+              style={{
+                transform: `scale(${fovZoom})`,
+                backgroundImage: `url("${currentUrl}")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+              className="relative h-full w-full transition-transform duration-75 ease-out"
+            >
+              <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_90px_rgba(7,7,18,0.7)]" />
+
+              {sceneEquipment.map((hotspot) => (
                 <EquipmentHotspot
                   key={hotspot.id}
-                  hotspot={wrappedHotspot}
+                  hotspot={hotspot}
+                  compact={immersive}
                   isActive={selectedHotspot?.id === hotspot.id}
                   onSelect={setSelectedHotspot}
+                  onOpenSystemModal={handleOpenSystemModal}
                 />
-              )
-            })}
+              ))}
 
-            {easterEggs.map((egg) => {
-              const wrappedEgg: HotspotDTO = {
-                ...egg,
-                x_percent: computeWrappedX(egg.x_percent),
-                y_percent: Math.max(
-                  12,
-                  Math.min(88, egg.y_percent + (is360Mode ? pitchDeg * 0.4 : 0)),
-                ),
-              }
-              return (
+              {easterEggs.map((egg) => (
                 <EasterEggTrigger
                   key={egg.id}
-                  hotspot={wrappedEgg}
+                  hotspot={egg}
                   onClaim={(id) => void claimEgg(id)}
                   isClaiming={claimingId === egg.id}
                 />
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          )
         ) : (
           <div
             style={{
@@ -462,8 +617,20 @@ export function RoomModal() {
               <EquipmentHotspot
                 key={hotspot.id}
                 hotspot={hotspot}
+                compact={immersive}
                 isActive={selectedHotspot?.id === hotspot.id}
                 onSelect={setSelectedHotspot}
+                onOpenSystemModal={handleOpenSystemModal}
+              />
+            ))}
+
+            {sceneLinks.map((link) => (
+              <StreetViewArrow
+                key={link.id}
+                link={link}
+                compact={immersive}
+                isLocked={zones[link.targetZoneId]?.status === 'LOCKED'}
+                onNavigate={handleNavigateLink}
               />
             ))}
 
@@ -479,31 +646,31 @@ export function RoomModal() {
         )}
       </div>
 
-      <div className="z-30 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 bg-[#101022]/95 px-6 py-3 backdrop-blur-md">
+      <div className={`z-30 flex flex-wrap items-center justify-between gap-4 border-t border-[#2F4045] bg-[#233134] px-6 py-3 ${immersive ? 'hidden' : ''}`}>
         <div className="flex items-center gap-3 text-left">
-          <Info className="h-4 w-4 shrink-0 text-indigo-400" />
-          <p className="text-xs text-slate-300">
-            <span className="font-semibold text-white">{zone.name}:</span>{' '}
+          <Info className="h-4 w-4 shrink-0 text-[#80EAFF]" />
+          <p className="text-xs text-[#9DB0B4]">
+            <span className="font-bold text-white">{zone.name}:</span>{' '}
             {zone.description} ·{' '}
-            <span className="text-emerald-300">
-              Hover over any equipment pin on the image to view usage instructions
+            <span className="font-semibold text-[#80EAFF]">
+              Click floor arrows to walk through the office or hover pins for details
             </span>
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {scenes.length > 1 && (
-            <div className="flex items-center gap-1.5 mr-2 border-r border-white/10 pr-3">
-              <Images className="h-3.5 w-3.5 text-indigo-400" />
+            <div className="flex items-center gap-1.5 mr-2 border-r border-[#2F4045] pr-3">
+              <Images className="h-3.5 w-3.5 text-[#80EAFF]" />
               {scenes.map((scene, idx) => (
                 <button
                   key={scene.id}
                   type="button"
                   onClick={() => setActiveSceneIndex(idx)}
-                  className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
+                  className={`rounded-[6px] px-3 py-1 text-xs font-semibold transition cursor-pointer ${
                     safeIndex === idx
-                      ? 'border-indigo-400 bg-indigo-600 text-white'
-                      : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
+                      ? 'bg-[#80EAFF] text-[#0D1A1D]'
+                      : 'bg-[#2F4045] text-white hover:bg-[#3B5157]'
                   }`}
                 >
                   {scene.label}
@@ -512,14 +679,98 @@ export function RoomModal() {
             </div>
           )}
 
-          {sceneEquipment.length === 0 && (
-            <span className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-              Search the room view for hidden Xsolla emblems
-            </span>
-          )}
+          <span className="flex items-center gap-1.5 text-xs font-medium text-[#9DB0B4]">
+            <Sparkles className="h-3.5 w-3.5 text-[#80EAFF]" />
+            Spot hidden Xsolla logos in the 360° view
+          </span>
         </div>
       </div>
+
+      <Modal
+        isOpen={Boolean(systemModalHotspot)}
+        onClose={() => setSystemModalHotspot(null)}
+        title={
+          systemModalHotspot?.category === 'MONITOR'
+            ? `Weekly Schedule · ${systemModalHotspot.title}`
+            : `LMS Tasks · ${systemModalHotspot?.title || ''}`
+        }
+        subtitle={
+          systemModalHotspot?.category === 'MONITOR'
+            ? 'External Weekly Schedule System Integration Placeholder'
+            : 'External Xsolla School LMS Tasks Integration Placeholder'
+        }
+        maxWidthClass="max-w-xl"
+      >
+        {systemModalHotspot && (
+          <div className="flex flex-col gap-4 text-left">
+            <div className="relative rounded-[6px] border border-[#80EAFF]/40 bg-[#153640] p-4 overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#80EAFF]" />
+              <p className="text-xs font-bold uppercase tracking-wider text-[#80EAFF] mb-1">
+                {systemModalHotspot.category === 'MONITOR'
+                  ? 'Monitor / Projector Schedule Feed'
+                  : 'Workstation LMS Task Feed'}
+              </p>
+              <p className="text-sm text-white leading-relaxed font-medium">
+                {systemModalHotspot.content}
+              </p>
+            </div>
+
+            {systemModalHotspot.category === 'MONITOR' ? (
+              <div className="rounded-[6px] border border-[#2F4045] bg-[#1B2628] p-4 text-xs text-white space-y-2">
+                <div className="flex items-center justify-between border-b border-[#2F4045] pb-2 font-bold text-white">
+                  <span>Day / Time</span>
+                  <span>Session / Room Booking</span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-[#9DB0B4]">Mon · 10:00 – 12:00</span>
+                  <span className="font-medium">Go Clean Architecture Lecture & Review</span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-[#9DB0B4]">Wed · 14:00 – 16:00</span>
+                  <span className="font-medium">React & TypeScript Frontend Workshop</span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-[#9DB0B4]">Fri · 16:00 – 18:00</span>
+                  <span className="font-medium">Sprint Demo & Team Retrospective</span>
+                </div>
+                <p className="pt-2 text-[11px] text-[#9DB0B4]">
+                  Connect live API or set{' '}
+                  <code className="text-[#80EAFF] font-semibold">
+                    EXTERNAL_INTEGRATION_URLS.WEEKLY_SCHEDULE_URL
+                  </code>{' '}
+                  in <code className="text-[#80EAFF] font-semibold">roomScenes.ts</code>.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-[6px] border border-[#2F4045] bg-[#1B2628] p-4 text-xs text-white space-y-2">
+                <div className="flex items-center justify-between border-b border-[#2F4045] pb-2 font-bold text-white">
+                  <span>LMS Task</span>
+                  <span>Status</span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="font-medium">Implement 360° Street View Navigation Graph</span>
+                  <span className="rounded bg-[#153640] border border-[#80EAFF]/40 px-2 py-0.5 text-[10px] font-bold text-[#80EAFF]">
+                    IN PROGRESS
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="font-medium">Connect Weekly Schedule & LMS API Endpoints</span>
+                  <span className="rounded bg-[#2F4045] px-2 py-0.5 text-[10px] font-bold text-white">
+                    TO DO
+                  </span>
+                </div>
+                <p className="pt-2 text-[11px] text-[#9DB0B4]">
+                  Connect live LMS API or set{' '}
+                  <code className="text-[#80EAFF] font-semibold">
+                    EXTERNAL_INTEGRATION_URLS.LMS_TASKS_URL
+                  </code>{' '}
+                  in <code className="text-[#80EAFF] font-semibold">roomScenes.ts</code>.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
