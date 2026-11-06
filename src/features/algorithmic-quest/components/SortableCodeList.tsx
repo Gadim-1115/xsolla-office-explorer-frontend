@@ -1,4 +1,4 @@
-import {
+﻿import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -43,17 +43,17 @@ function SortableCodeItem({ block, index }: SortableCodeItemProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`group flex items-center gap-3 rounded-xl border px-4 py-3 font-mono text-sm select-none cursor-grab active:cursor-grabbing transition ${
+      className={`group flex items-center gap-3 rounded-[6px] border px-4 py-3 font-mono text-sm select-none cursor-grab active:cursor-grabbing transition ${
         isDragging
-          ? 'z-20 border-indigo-400 bg-indigo-950/90 shadow-lg shadow-indigo-500/20 scale-[1.02]'
-          : 'border-white/10 bg-[#101020] hover:border-indigo-500/50 hover:bg-[#15152b]'
+          ? 'z-20 border-[#80EAFF]/70 bg-[#153640] shadow-md scale-[1.01]'
+          : 'border-[#2F4045] bg-[#1B2628] hover:border-[#80EAFF]/70 hover:bg-[#2A3C40]'
       }`}
     >
-      <GripVertical className="h-4 w-4 shrink-0 text-slate-500 group-hover:text-indigo-400" />
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/5 text-xs font-bold text-slate-400">
+      <GripVertical className="h-4 w-4 shrink-0 text-[#9DB0B4] group-hover:text-[#80EAFF]" />
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] bg-[#2F4045] text-xs font-bold text-white">
         {index + 1}
       </span>
-      <pre className="flex-1 overflow-x-auto text-left text-emerald-300 whitespace-pre-wrap">
+      <pre className="flex-1 overflow-x-auto text-left text-white font-semibold whitespace-pre-wrap">
         {block.code}
       </pre>
     </div>
@@ -88,7 +88,7 @@ export function SortableCodeList({ blocks, onReorder }: SortableCodeListProps) {
         items={blocks.map((b) => b.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2">
           {blocks.map((block, index) => (
             <SortableCodeItem key={block.id} block={block} index={index} />
           ))}

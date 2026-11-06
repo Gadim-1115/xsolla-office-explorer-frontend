@@ -33,28 +33,33 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4"
       onClick={onClose}
     >
       <div
-        className={`relative w-full ${maxWidthClass} rounded-2xl border border-indigo-500/30 bg-[#16162a] text-slate-100 shadow-2xl overflow-hidden`}
+        className={`relative w-full ${maxWidthClass} rounded-xl border border-[#2F4045] bg-[#233134] text-white shadow-[0_24px_70px_rgba(0,0,0,0.18)] overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-4 bg-[#1c1c36]">
-          <div>
+        <div className="h-[3px] w-full bg-[#80EAFF]" />
+        <div className="flex items-start justify-between gap-4 border-b border-[#2F4045] px-6 py-4 bg-[#233134]">
+          <div className="text-left">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-bold tracking-tight text-white">{title}</h2>
+              <h2 className="text-lg font-bold tracking-tight text-white">
+                {title}
+              </h2>
               {badge}
             </div>
-            {subtitle && <p className="mt-1 text-xs text-slate-400">{subtitle}</p>}
+            {subtitle && (
+              <p className="mt-1 text-xs text-[#9DB0B4]">{subtitle}</p>
+            )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition"
+            className="rounded-[6px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
             aria-label="Close modal"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
         <div className="max-h-[80vh] overflow-y-auto p-6">{children}</div>

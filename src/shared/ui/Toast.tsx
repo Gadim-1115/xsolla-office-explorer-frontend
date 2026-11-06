@@ -16,7 +16,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+    <div className="fixed bottom-5 right-5 z-[70] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
       {toasts.map((toast) => {
         const isAchievement = toast.type === 'achievement'
         const isError = toast.type === 'error'
@@ -24,33 +24,32 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-start gap-3 rounded-xl border p-4 shadow-xl backdrop-blur-md transition-all ${
-              isAchievement
-                ? 'border-amber-400/50 bg-amber-950/90 text-amber-100'
-                : isError
-                  ? 'border-rose-500/50 bg-rose-950/90 text-rose-100'
-                  : 'border-emerald-500/50 bg-emerald-950/90 text-emerald-100'
-            }`}
+            className="pointer-events-auto relative flex items-start gap-3 rounded-xl border border-[#2F4045] bg-[#233134] p-4 text-white shadow-[0_14px_40px_rgba(0,0,0,0.14)] overflow-hidden transition-all"
           >
+            <div
+              className={`absolute top-0 left-0 right-0 h-[3px] ${
+                isError ? 'bg-[#3A2429]0' : 'bg-[#80EAFF]'
+              }`}
+            />
             <div className="mt-0.5 shrink-0">
               {isAchievement ? (
-                <Sparkles className="h-5 w-5 text-amber-400" />
+                <Sparkles className="h-5 w-5 text-[#80EAFF]" />
               ) : isError ? (
-                <AlertTriangle className="h-5 w-5 text-rose-400" />
+                <AlertTriangle className="h-5 w-5 text-rose-500" />
               ) : (
-                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                <CheckCircle2 className="h-5 w-5 text-[#80EAFF]" />
               )}
             </div>
             <div className="flex-1 text-left">
-              <p className="text-sm font-semibold">{toast.title}</p>
+              <p className="text-sm font-bold text-white">{toast.title}</p>
               {toast.description && (
-                <p className="mt-0.5 text-xs opacity-85">{toast.description}</p>
+                <p className="mt-0.5 text-xs text-[#9DB0B4]">{toast.description}</p>
               )}
             </div>
             <button
               type="button"
               onClick={() => onDismiss(toast.id)}
-              className="rounded p-1 opacity-70 hover:opacity-100 transition"
+              className="rounded p-1 text-[#9DB0B4] hover:text-white transition cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>

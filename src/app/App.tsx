@@ -7,7 +7,7 @@ import { RoomModal } from '../features/room-inspector/components/RoomModal'
 export function App() {
   return (
     <ExplorerProvider>
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0d0d1a] text-slate-100">
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#1B2628] text-white">
         <ProgressHeader />
         <OfficeMapCanvas />
         <QuestModal />
