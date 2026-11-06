@@ -109,24 +109,24 @@ export function CrescentFloorSvg({
 
     if (zoneId === 'zone_stock') {
       return {
-        fill: isHovered ? '#1f1f3a' : '#0D0D17',
-        stroke: '#6C5CE7',
-        fillOpacity: 0.95,
+        fill: isHovered ? '#2F4045' : '#1F2B2E',
+        stroke: '#3A5056',
+        fillOpacity: 0.96,
       }
     }
 
     if (isLocked) {
       return {
-        fill: isHovered ? '#34245c' : '#1b1833',
-        stroke: isHovered ? '#f59e0b' : '#6C5CE7',
-        fillOpacity: 0.92,
+        fill: isHovered ? '#4A2A33' : '#33262B',
+        stroke: isHovered ? '#FB7185' : '#8A4A5A',
+        fillOpacity: 0.96,
       }
     }
 
     return {
-      fill: isHovered ? '#35356b' : '#252542',
-      stroke: isHovered ? '#34d399' : '#6C5CE7',
-      fillOpacity: 0.95,
+      fill: isHovered ? '#153640' : '#233134',
+      stroke: isHovered ? '#80EAFF' : '#3A5056',
+      fillOpacity: 0.98,
     }
   }
 
@@ -139,62 +139,83 @@ export function CrescentFloorSvg({
     >
       <g id="xsolla_office_map">
         <g clipPath="url(#clip0_0_1)">
-          <rect width="1920" height="1080" fill="#131324" />
+          <rect width="1920" height="1080" fill="#141E20" />
+          <rect width="1920" height="1080" fill="url(#map_dots)" />
+          <ellipse cx="961" cy="529" rx="700" ry="470" fill="url(#map_glow)" />
+          <ellipse
+            cx="961"
+            cy="529"
+            rx="640"
+            ry="415"
+            stroke="#2F4045"
+            strokeWidth="1.5"
+            strokeDasharray="4 10"
+          />
+          <ellipse
+            cx="961"
+            cy="529"
+            rx="595"
+            ry="380"
+            stroke="#233134"
+            strokeWidth="1.5"
+          />
           <ellipse
             id="Ellipse 1"
             cx="961"
             cy="529"
             rx="550"
             ry="345"
-            fill="#D9D9D9"
-            fillOpacity="0.18"
+            fill="#1B2628"
+            fillOpacity="0.85"
+            stroke="#2F4045"
+            strokeWidth="2"
           />
 
           <g id="base_structure">
             <path
               id="Vector 1"
               d="M1122.5 450.5L959.5 442V645.5L1120 635.5L1122.5 450.5Z"
-              fill="#0D0D17"
+              fill="#0F1719"
             />
             <path
               id="Vector 2"
               d="M692.5 624V461.5L798.5 450.5L795.5 637L692.5 624Z"
-              fill="#0D0D17"
+              fill="#0F1719"
             />
             <path
               id="Vector 3"
               d="M1174 458L1126 453V635.5L1174 632V458Z"
-              fill="#0D0D17"
+              fill="#0F1719"
             />
             <g id="Vector 21">
               <path
                 d="M797 636L801.5 450.5L848 444.359V640.5L797 636Z"
-                fill="#0D0D17"
+                fill="#0F1719"
               />
               <path
                 d="M956 643.5L852.5 640.5V444.359L956 443V643.5Z"
-                fill="#0D0D17"
+                fill="#0F1719"
               />
               <path
                 d="M1229.5 466L1177 458V630.5L1229.5 622.5V466Z"
-                fill="#0D0D17"
+                fill="#0F1719"
               />
               <path
                 d="M801.5 450.5L797 636L848 640.5V444.359L801.5 450.5ZM852.5 640.5L956 643.5V443L852.5 444.359V640.5ZM1177 458L1229.5 466V622.5L1177 630.5V458Z"
-                stroke="#0D0D17"
+                stroke="#2F4045"
               />
             </g>
             <text
               x="960"
               y="545"
               textAnchor="middle"
-              fill="#4b5563"
+              fill="#6F8488"
               fontSize="16"
               fontWeight="700"
               letterSpacing="3"
               className="pointer-events-none uppercase"
             >
-              31st Floor Core · Elevators & Stairs
+              31st Floor Core
             </text>
           </g>
 
@@ -226,13 +247,13 @@ export function CrescentFloorSvg({
             <path
               d="M810.796 406.306H815.417C815.693 406.306 815.917 406.53 815.917 406.806V418.049C815.917 418.325 815.693 418.549 815.417 418.549H810.796C810.52 418.549 810.296 418.325 810.296 418.049V406.806C810.296 406.53 810.52 406.306 810.796 406.306Z"
               strokeLinecap="round"
-              stroke="#38bdf8"
+              stroke="#80EAFF"
               strokeWidth="1.5"
             />
             <path
               d="M809.337 403.5H816.652C816.928 403.5 817.152 403.724 817.152 404V405.591C817.152 405.868 816.928 406.091 816.652 406.091H809.337C809.061 406.091 808.837 405.868 808.837 405.591V404C808.837 403.724 809.061 403.5 809.337 403.5Z"
               strokeLinecap="round"
-              stroke="#38bdf8"
+              stroke="#80EAFF"
               strokeWidth="1.5"
             />
           </g>
@@ -241,13 +262,13 @@ export function CrescentFloorSvg({
             <path
               d="M1189.8 403.306H1194.42C1194.69 403.306 1194.92 403.53 1194.92 403.806V415.049C1194.92 415.325 1194.69 415.549 1194.42 415.549H1189.8C1189.52 415.549 1189.3 415.325 1189.3 415.049V403.806C1189.3 403.53 1189.52 403.306 1189.8 403.306Z"
               strokeLinecap="round"
-              stroke="#38bdf8"
+              stroke="#80EAFF"
               strokeWidth="1.5"
             />
             <path
               d="M1188.34 400.5H1195.65C1195.93 400.5 1196.15 400.724 1196.15 401V402.591C1196.15 402.868 1195.93 403.091 1195.65 403.091H1188.34C1188.06 403.091 1187.84 402.868 1187.84 402.591V401C1187.84 400.724 1188.06 400.5 1188.34 400.5Z"
               strokeLinecap="round"
-              stroke="#38bdf8"
+              stroke="#80EAFF"
               strokeWidth="1.5"
             />
           </g>
@@ -256,7 +277,7 @@ export function CrescentFloorSvg({
             <path
               d="M1305.8 575.306H1310.42C1310.69 575.306 1310.92 575.53 1310.92 575.806V587.049C1310.92 587.325 1310.69 587.549 1310.42 587.549H1305.8C1305.52 587.549 1305.3 587.325 1305.3 587.049V575.806C1305.3 575.53 1305.52 575.306 1305.8 575.306Z"
               strokeLinecap="round"
-              stroke="#38bdf8"
+              stroke="#80EAFF"
               strokeWidth="1.5"
             />
           </g>
@@ -264,7 +285,7 @@ export function CrescentFloorSvg({
           <g id="proyektor icon" className="pointer-events-none">
             <path
               d="M1247 449.5H1259.69C1260.51 449.5 1261.19 450.172 1261.19 451V456.471C1261.19 457.299 1260.51 457.971 1259.69 457.971H1247C1246.17 457.971 1245.5 457.299 1245.5 456.471V451C1245.5 450.172 1246.17 449.5 1247 449.5Z"
-              stroke="#a78bfa"
+              stroke="#80EAFF"
               strokeWidth="1.5"
             />
           </g>
@@ -272,7 +293,7 @@ export function CrescentFloorSvg({
           <g id="proyektor icon_2" className="pointer-events-none">
             <path
               d="M947 723.5H959.686C960.515 723.5 961.186 724.172 961.186 725V730.471C961.186 731.299 960.515 731.971 959.686 731.971H947C946.172 731.971 945.5 731.299 945.5 730.471V725C945.5 724.172 946.172 723.5 947 723.5Z"
-              stroke="#a78bfa"
+              stroke="#80EAFF"
               strokeWidth="1.5"
             />
           </g>
@@ -280,7 +301,7 @@ export function CrescentFloorSvg({
           <g id="proyektor icon_3" className="pointer-events-none">
             <path
               d="M864 727.5H876.686C877.515 727.5 878.186 728.172 878.186 729V734.471C878.186 735.299 877.515 735.971 876.686 735.971H864C863.172 735.971 862.5 735.299 862.5 734.471V729C862.5 728.172 863.172 727.5 864 727.5Z"
-              stroke="#a78bfa"
+              stroke="#80EAFF"
               strokeWidth="1.5"
             />
           </g>
@@ -290,6 +311,8 @@ export function CrescentFloorSvg({
             const isLocked = zone ? zone.status === 'LOCKED' : false
             const isHovered = hoveredZoneId === zoneId
 
+            const labelWidth = Math.max(60, pos.shortLabel.length * 7.4 + 24)
+
             return (
               <g
                 key={`label-${zoneId}`}
@@ -297,46 +320,54 @@ export function CrescentFloorSvg({
                 className="pointer-events-none"
               >
                 <rect
-                  x={-54}
-                  y={-14}
-                  width={108}
-                  height={28}
-                  rx={8}
-                  fill={isLocked ? '#141127' : '#0f2926'}
-                  fillOpacity={0.88}
+                  x={-labelWidth / 2}
+                  y={-16}
+                  width={labelWidth}
+                  height={32}
+                  rx={7}
+                  fill={isLocked ? '#33262B' : isHovered ? '#80EAFF' : '#141E20'}
+                  fillOpacity={0.96}
                   stroke={
                     isHovered
-                      ? '#ffffff'
+                      ? '#80EAFF'
                       : isLocked
-                        ? '#f59e0b'
-                        : '#10b981'
+                        ? '#FB7185'
+                        : '#3A5056'
                   }
-                  strokeWidth={isHovered ? 1.8 : 1}
+                  strokeWidth={isHovered ? 2 : 1.3}
                 />
                 <text
                   x={0}
-                  y={4}
+                  y={4.5}
                   textAnchor="middle"
-                  fill={isLocked ? '#fde68a' : '#a7f3d0'}
-                  fontSize="10.5"
+                  fill={isLocked ? '#FDA4AF' : isHovered ? '#0D1A1D' : '#FFFFFF'}
+                  fontSize="13"
                   fontWeight="700"
                 >
-                  {isLocked ? `🔒 ${pos.shortLabel}` : `✓ ${pos.shortLabel}`}
+                  {pos.shortLabel}
                 </text>
               </g>
             )
           })}
+
+          <g className="pointer-events-none" transform="translate(1640 905)">
+            <circle r="34" fill="#141E20" stroke="#2F4045" strokeWidth="1.5" />
+            <path d="M0 -26L7 0L0 26L-7 0Z" fill="#2F4045" />
+            <path d="M0 -26L7 0L-7 0Z" fill="#80EAFF" />
+            <text y="-40" textAnchor="middle" fill="#9DB0B4" fontSize="13" fontWeight="700">
+              N
+            </text>
+          </g>
         </g>
-        <rect
-          x="1.5"
-          y="1.5"
-          width="1917"
-          height="1077"
-          stroke="#3A3A5E"
-          strokeWidth="3"
-        />
       </g>
       <defs>
+        <pattern id="map_dots" width="32" height="32" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r="1.2" fill="#233134" />
+        </pattern>
+        <radialGradient id="map_glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#80EAFF" stopOpacity="0.10" />
+          <stop offset="100%" stopColor="#80EAFF" stopOpacity="0" />
+        </radialGradient>
         <clipPath id="clip0_0_1">
           <rect width="1920" height="1080" fill="white" />
         </clipPath>

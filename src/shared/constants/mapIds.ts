@@ -51,3 +51,31 @@ export const ZONE_LABEL_POSITIONS: Record<string, ZoneLabelPosition> = {
   zone_kitchen: { cx: 1275, cy: 560, shortLabel: 'Kitchen' },
   zone_stock: { cx: 1275, cy: 483, shortLabel: 'Stock' },
 }
+
+export interface ElevatorEntrancePin {
+  id: string
+  label: string
+  x_percent: number
+  y_percent: number
+  targetZoneId: string
+  targetSceneId?: string
+}
+
+export const ELEVATOR_ENTRANCES: ElevatorEntrancePin[] = [
+  {
+    id: 'elevator_entrance_1',
+    label: 'Elevator Entrance 1',
+    x_percent: 51.8,
+    y_percent: 38.8,
+    targetZoneId: 'zone_lecturezone_open_space_1',
+    targetSceneId: 'zone_lift_1',
+  },
+  {
+    id: 'elevator_entrance_2',
+    label: 'Elevator Entrance 2',
+    x_percent: 51.8,
+    y_percent: 62.2,
+    targetZoneId: 'zone_open_space_2',
+    targetSceneId: 'zone_lift_2',
+  },
+]

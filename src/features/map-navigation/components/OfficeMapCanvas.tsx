@@ -1,12 +1,29 @@
 import { useState } from 'react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
-import { ZoomIn, ZoomOut, Maximize2, Lock, Unlock } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize2, Lock, Unlock, DoorOpen, Info, X } from 'lucide-react'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
 import { useMapInteraction } from '../hooks/useMapInteraction'
 import { CrescentFloorSvg } from './CrescentFloorSvg'
 import { MapHotspotPin } from './MapHotspotPin'
-import { useEasterEgg } from '../../room-inspector/hooks/useEasterEgg'
-import { ZONE_LABEL_POSITIONS } from '../../../shared/constants/mapIds'
+import {
+  ELEVATOR_ENTRANCES,
+  MAP_ZONE_IDS,
+  ZONE_LABEL_POSITIONS,
+} from '../../../shared/constants/mapIds'
+import type { HotspotDTO } from '../../../shared/types/api.types'
+
+const MAP_WIDTH = 'min(141vw, calc((100vh - 65px) * 2.64))'
+
+const STOCK_INFO_HOTSPOT: HotspotDTO = {
+  id: 'info_stock',
+  zone_id: MAP_ZONE_IDS.STOCK,
+  category: 'STOCK',
+  x_percent: 0,
+  y_percent: 0,
+  title: 'Stock Room',
+  content: 'Office storage and equipment supply room.',
+  is_claimed: false,
+}
 
 export function OfficeMapCanvas() {
   const {
@@ -20,15 +37,20 @@ export function OfficeMapCanvas() {
     error,
   } = useExplorer()
   const { hoveredZoneId, setHoveredZoneId } = useMapInteraction()
-  const { claimEgg } = useEasterEgg()
 
   const [divingZoneId, setDivingZoneId] = useState<string | null>(null)
+  const [legendOpen, setLegendOpen] = useState<boolean>(false)
 
   const hoveredZone = hoveredZoneId ? zones[hoveredZoneId] : null
 
-  const triggerZoneClick = (zoneId: string) => {
+  const triggerZoneClick = (zoneId: string, sceneId?: string) => {
     const zone = zones[zoneId]
     if (!zone) return
+
+    if (zoneId === MAP_ZONE_IDS.STOCK) {
+      openMapHotspot(STOCK_INFO_HOTSPOT)
+      return
+    }
 
     if (zone.status === 'LOCKED') {
       openQuestModal(zoneId)
@@ -37,7 +59,7 @@ export function OfficeMapCanvas() {
 
     setDivingZoneId(zoneId)
     setTimeout(() => {
-      openRoomModal(zoneId)
+      openRoomModal(zoneId, sceneId)
       setTimeout(() => {
         setDivingZoneId(null)
       }, 250)
@@ -50,22 +72,26 @@ export function OfficeMapCanvas() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center bg-[#0d0d1a] text-slate-300">
-        <div className="h-10 w-10 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent mb-3" />
-        <p className="text-sm font-medium">Initializing 31st-Floor Oval Office Map...</p>
+      <div className="flex flex-1 flex-col items-center justify-center bg-[#1B2628] text-[#9DB0B4]">
+        <div className="h-10 w-10 animate-spin rounded-full border-3 border-[#80EAFF]/70 border-t-transparent mb-3" />
+        <p className="text-sm font-semibold text-white">
+          Initializing Xsolla 31st-Floor Oval Office Map...
+        </p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center bg-[#0d0d1a] p-6 text-center">
-        <div className="max-w-md rounded-2xl border border-rose-500/40 bg-rose-950/30 p-6">
-          <p className="text-base font-bold text-rose-300">Backend Connection Error</p>
-          <p className="mt-2 text-xs text-slate-300">{error}</p>
-          <p className="mt-3 text-[11px] text-slate-400">
+      <div className="flex flex-1 flex-col items-center justify-center bg-[#1B2628] p-6 text-center">
+        <div className="max-w-md rounded-xl border border-rose-400/50 bg-[#233134] p-6 shadow-lg">
+          <p className="text-base font-bold text-rose-400">
+            Backend Connection Error
+          </p>
+          <p className="mt-2 text-xs text-[#9DB0B4]">{error}</p>
+          <p className="mt-3 text-[11px] text-[#9DB0B4]">
             Make sure the Go server is running on{' '}
-            <code className="text-indigo-300">http://localhost:8080</code>
+            <code className="text-[#80EAFF] font-semibold">http://localhost:8080</code>
           </p>
         </div>
       </div>
@@ -73,7 +99,7 @@ export function OfficeMapCanvas() {
   }
 
   return (
-    <div className="relative flex-1 overflow-hidden bg-[#0d0d1a]">
+    <div className="relative flex-1 overflow-hidden bg-[#1B2628]">
       <TransformWrapper
         initialScale={1}
         minScale={0.65}
@@ -83,49 +109,54 @@ export function OfficeMapCanvas() {
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
-            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-              <div className="rounded-xl border border-white/10 bg-[#141428]/90 px-4 py-3 backdrop-blur-md text-left shadow-xl">
-                <p className="text-xs font-bold uppercase tracking-wider text-indigo-400">
-                  Map Legend
-                </p>
-                <div className="mt-2 flex flex-col gap-1.5 text-xs text-slate-300">
-                  <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-sm border border-amber-400 bg-[#1b1833]" />
-                    <span>Locked Zone (Click to solve Go Quest)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-sm border border-emerald-400 bg-[#252542]" />
-                    <span>Unlocked Zone (Click to dive into 360° room)</span>
+            <div className="absolute top-4 left-4 z-20 flex flex-col items-start gap-2">
+              <button
+                type="button"
+                onClick={() => setLegendOpen((v) => !v)}
+                title={legendOpen ? 'Hide legend' : 'Show legend'}
+                className="flex h-9 w-9 items-center justify-center rounded-[6px] border border-[#2F4045] bg-[#233134] text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
+              >
+                {legendOpen ? <X className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+              </button>
+
+              {legendOpen && (
+                <div className="rounded-xl border border-[#2F4045] bg-[#233134] px-4 py-3 text-left shadow-[0_12px_36px_rgba(0,0,0,0.25)]">
+                  <div className="flex flex-col gap-2 text-xs text-[#9DB0B4]">
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-3 w-3 rounded-[3px] border border-rose-400 bg-[#3A2429]" />
+                      <span>Locked</span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-3 w-3 rounded-[3px] border border-[#80EAFF]/70 bg-[#153640]" />
+                      <span>Unlocked</span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-3 w-3 rounded-full bg-[#80EAFF] border border-[#80EAFF]/70" />
+                      <span>Elevator entrance</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {hoveredZone && !divingZoneId && (
-                <div className="rounded-xl border border-indigo-500/40 bg-[#181832]/95 px-4 py-3 backdrop-blur-md text-left shadow-xl">
-                  <div className="flex items-center gap-2">
-                    {hoveredZone.status === 'LOCKED' ? (
-                      <Lock className="h-4 w-4 text-amber-400" />
-                    ) : (
-                      <Unlock className="h-4 w-4 text-emerald-400" />
-                    )}
-                    <span className="text-sm font-bold text-white">
-                      {hoveredZone.name}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {hoveredZone.status === 'LOCKED'
-                      ? `Locked (${hoveredZone.difficulty?.replace('_', ' ')}) — Click to solve algorithmic quest`
-                      : 'Unlocked — Click to enter 360° panoramic room view'}
-                  </p>
+                <div className="flex items-center gap-2 rounded-[6px] border border-[#80EAFF]/40 bg-[#153640] px-3 py-1.5">
+                  {hoveredZone.status === 'LOCKED' ? (
+                    <Lock className="h-3.5 w-3.5 text-rose-400" />
+                  ) : (
+                    <Unlock className="h-3.5 w-3.5 text-[#80EAFF]" />
+                  )}
+                  <span className="text-xs font-bold text-white">
+                    {hoveredZone.name}
+                  </span>
                 </div>
               )}
             </div>
 
-            <div className="absolute bottom-5 left-5 z-20 flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#141428]/90 p-1.5 backdrop-blur-md shadow-xl">
+            <div className="absolute bottom-5 left-5 z-20 flex items-center gap-1.5 rounded-xl border border-[#2F4045] bg-[#233134] p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.08)]">
               <button
                 type="button"
                 onClick={() => zoomIn()}
-                className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition"
+                className="rounded-[6px] bg-[#2F4045] p-2 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
                 title="Zoom In"
               >
                 <ZoomIn className="h-4 w-4" />
@@ -133,7 +164,7 @@ export function OfficeMapCanvas() {
               <button
                 type="button"
                 onClick={() => zoomOut()}
-                className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition"
+                className="rounded-[6px] bg-[#2F4045] p-2 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
                 title="Zoom Out"
               >
                 <ZoomOut className="h-4 w-4" />
@@ -141,7 +172,7 @@ export function OfficeMapCanvas() {
               <button
                 type="button"
                 onClick={() => resetTransform()}
-                className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white transition"
+                className="rounded-[6px] bg-[#2F4045] p-2 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
                 title="Reset View"
               >
                 <Maximize2 className="h-4 w-4" />
@@ -151,11 +182,8 @@ export function OfficeMapCanvas() {
             <TransformComponent
               wrapperStyle={{ width: '100%', height: '100%' }}
               contentStyle={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                width: MAP_WIDTH,
+                aspectRatio: '16 / 9',
               }}
             >
               <div
@@ -163,8 +191,9 @@ export function OfficeMapCanvas() {
                   transformOrigin: `${originX} ${originY}`,
                   transitionDuration: divingZoneId ? '900ms' : '500ms',
                   transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                  left: '-4.95%',
                 }}
-                className={`relative aspect-video w-[1280px] max-w-none shadow-2xl transition-all ${
+                className={`relative h-full w-full max-w-none transition-all ${
                   divingZoneId
                     ? 'scale-[3.1] opacity-10 blur-[4px]'
                     : !selectedRoomZoneId
@@ -178,14 +207,33 @@ export function OfficeMapCanvas() {
                   onHoverZone={setHoveredZoneId}
                   onClickZone={triggerZoneClick}
                 />
-                {mapHotspots.map((hotspot) => (
-                  <MapHotspotPin
-                    key={hotspot.id}
-                    hotspot={hotspot}
-                    onSelect={openMapHotspot}
-                    onClaimEgg={(id) => void claimEgg(id)}
-                  />
+                {ELEVATOR_ENTRANCES.map((entrance) => (
+                  <button
+                    key={entrance.id}
+                    type="button"
+                    style={{
+                      left: `${entrance.x_percent}%`,
+                      top: `${entrance.y_percent}%`,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      triggerZoneClick(entrance.targetZoneId, entrance.targetSceneId)
+                    }}
+                    className="group absolute -translate-x-1/2 -translate-y-1/2 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-[#80EAFF]/70 bg-[#80EAFF] text-[#0D1A1D] shadow-[0_0_0_6px_rgba(128,234,255,0.15)] hover:scale-125 hover:bg-[#A6F1FF] transition-all cursor-pointer"
+                    title={entrance.label}
+                  >
+                    <DoorOpen className="h-5 w-5 shrink-0 stroke-[2.2]" />
+                  </button>
                 ))}
+                {mapHotspots
+                  .filter((hotspot) => hotspot.category !== 'EASTER_EGG')
+                  .map((hotspot) => (
+                    <MapHotspotPin
+                      key={hotspot.id}
+                      hotspot={hotspot}
+                      onSelect={openMapHotspot}
+                    />
+                  ))}
               </div>
             </TransformComponent>
           </>
