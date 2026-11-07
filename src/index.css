@@ -54,6 +54,15 @@ code, pre, .font-mono {
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* rows that scroll sideways on phones (room toolbar, photo buttons): no visible scrollbar */
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @keyframes roomDiveIn {
   0% {
     opacity: 0;
@@ -69,13 +78,4 @@ code, pre, .font-mono {
 
 .animate-room-dive-in {
   animation: roomDiveIn 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-/* rows that scroll sideways on phones (room toolbar, photo buttons): no visible scrollbar */
-@utility scrollbar-none {
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
 }
