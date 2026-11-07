@@ -3,6 +3,7 @@ import { ProgressHeader } from '../features/onboarding-progress/components/Progr
 import { OfficeMapCanvas } from '../features/map-navigation/components/OfficeMapCanvas'
 import { QuestModal } from '../features/algorithmic-quest/components/QuestModal'
 import { RoomModal } from '../features/room-inspector/components/RoomModal'
+import { CompletionCelebration } from '../features/onboarding-progress/components/CompletionCelebration'
 
 export function App() {
   return (
@@ -12,6 +13,7 @@ export function App() {
         <OfficeMapCanvas />
         <QuestModal />
         <RoomModal />
+        <CompletionCelebration />
       </div>
     </ExplorerProvider>
   )

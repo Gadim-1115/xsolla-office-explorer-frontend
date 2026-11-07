@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -27,6 +28,8 @@ interface ExplorerContextValue {
   selectedRoomZoneId: string | null
   selectedSceneId: string | null
   activeMapHotspot: HotspotDTO | null
+  isCelebrationOpen: boolean
+  closeCelebration: () => void
   openQuestModal: (zoneId: string) => void
   closeQuestModal: () => void
   openRoomModal: (zoneId: string, sceneId?: string) => void
@@ -41,6 +44,11 @@ interface ExplorerContextValue {
 
 const ExplorerContext = createContext<ExplorerContextValue | null>(null)
 
+/** Every locked zone is unlocked and every hidden Xsolla logo is found. */
+function isExplorationComplete(p: ProgressDTO): boolean {
+  return p.unlocked_zones_count >= p.total_locked_zones && p.found_eggs_count >= p.total_easter_eggs
+}
+
 export function ExplorerProvider({ children }: { children: ReactNode }) {
   const [zones, setZones] = useState<Record<string, ZoneDTO>>({})
   const [mapHotspots, setMapHotspots] = useState<HotspotDTO[]>([])
@@ -53,6 +61,24 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null)
   const [activeMapHotspot, setActiveMapHotspot] = useState<HotspotDTO | null>(null)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const [isCelebrationOpen, setIsCelebrationOpen] = useState<boolean>(false)
+  // latest progress, readable inside the stable callbacks below
+  const progressRef = useRef<ProgressDTO | null>(null)
+
+  /**
+   * Progress from an unlock or an egg claim. Celebrates only the step that crosses into 100%,
+   * so a student who finished earlier is not celebrated again on every page load.
+   */
+  const applyProgress = useCallback((updated: ProgressDTO) => {
+    const before = progressRef.current
+    if (before && !isExplorationComplete(before) && isExplorationComplete(updated)) {
+      setIsCelebrationOpen(true)
+    }
+    progressRef.current = updated
+    setProgress(updated)
+  }, [])
+
+  const closeCelebration = useCallback(() => setIsCelebrationOpen(false), [])
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -80,6 +106,7 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
       }
       setZones(zoneMap)
       setMapHotspots(data.map_hotspots)
+      progressRef.current = data.progress
       setProgress(data.progress)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to initialize office map'
@@ -99,7 +126,7 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
         ...prev,
         [unlockedZone.id]: unlockedZone,
       }))
-      setProgress(updatedProgress)
+      applyProgress(updatedProgress)
       setSelectedQuestZoneId(null)
       setSelectedRoomZoneId(unlockedZone.id)
       notify(
@@ -108,12 +135,12 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
         `Exploration progress is now ${updatedProgress.completion_percentage}%!`,
       )
     },
-    [notify],
+    [applyProgress, notify],
   )
 
   const handleEggClaimed = useCallback(
     (hotspotId: string, updatedProgress: ProgressDTO) => {
-      setProgress(updatedProgress)
+      applyProgress(updatedProgress)
       setZones((prev) => {
         const next: Record<string, ZoneDTO> = {}
         for (const [k, z] of Object.entries(prev)) {
@@ -135,7 +162,7 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
         `Easter Eggs found: ${updatedProgress.found_eggs_count} / ${updatedProgress.total_easter_eggs}`,
       )
     },
-    [notify],
+    [applyProgress, notify],
   )
 
   const zoneList = useMemo(() => Object.values(zones), [zones])
@@ -152,6 +179,8 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
       selectedRoomZoneId,
       selectedSceneId,
       activeMapHotspot,
+      isCelebrationOpen,
+      closeCelebration,
       openQuestModal: (zoneId: string) => setSelectedQuestZoneId(zoneId),
       closeQuestModal: () => setSelectedQuestZoneId(null),
       openRoomModal: (zoneId: string, sceneId?: string) => {
@@ -180,6 +209,8 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
       selectedRoomZoneId,
       selectedSceneId,
       activeMapHotspot,
+      isCelebrationOpen,
+      closeCelebration,
       handleZoneUnlocked,
       handleEggClaimed,
       notify,
