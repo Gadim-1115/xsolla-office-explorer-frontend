@@ -5,6 +5,14 @@ export const EXTERNAL_INTEGRATION_URLS = {
   LMS_TASKS_URL: '',
 }
 
+export interface LockedBlurFrame {
+  left_percent: number
+  top_percent: number
+  width_percent: number
+  height_percent: number
+  clipPath?: string
+}
+
 export interface StreetViewLink {
   id: string
   label: string
@@ -14,6 +22,7 @@ export interface StreetViewLink {
   targetZoneId: string
   targetSceneId?: string
   targetYaw?: number
+  lockedFrame?: LockedBlurFrame
 }
 
 export interface RoomSceneConfig {
@@ -92,14 +101,28 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
           y_percent: 38.0,
           direction: 'door',
           targetZoneId: 'zone_gameroom_3',
+          targetSceneId: 'zone_gameroom_3',
+          lockedFrame: {
+            left_percent: 1.0,
+            top_percent: 8.0,
+            width_percent: 17.8,
+            height_percent: 54.0,
+            clipPath: 'polygon(0% 4%, 45% 4%, 100% 18%, 100% 74%, 55% 90%, 0% 100%)',
+          },
         },
         {
           id: 'link_os1_start_gr4',
           label: 'Game Room 4 · PlayStation',
-          x_percent: 22.8,
-          y_percent: 36.0,
+          x_percent: 22.4,
+          y_percent: 34.0,
           direction: 'door',
           targetZoneId: 'zone_gameroom_4',
+          lockedFrame: {
+            left_percent: 19.8,
+            top_percent: 20.0,
+            width_percent: 4.8,
+            height_percent: 21.0,
+          },
         },
         {
           id: 'link_os1_start_gr1',
@@ -108,14 +131,29 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
           y_percent: 36.0,
           direction: 'door',
           targetZoneId: 'zone_gameroom_1',
+          targetSceneId: 'zone_gameroom_1',
+          lockedFrame: {
+            left_percent: 76.2,
+            top_percent: 24.0,
+            width_percent: 8.0,
+            height_percent: 22.0,
+          },
         },
         {
           id: 'link_os1_start_gr2',
           label: 'Game Room 2 · Foosball',
-          x_percent: 90.5,
-          y_percent: 35.0,
+          x_percent: 92.0,
+          y_percent: 36.0,
           direction: 'door',
           targetZoneId: 'zone_gameroom_2',
+          targetSceneId: 'zone_gameroom_2',
+          lockedFrame: {
+            left_percent: 85.5,
+            top_percent: 12.0,
+            width_percent: 14.0,
+            height_percent: 48.0,
+            clipPath: 'polygon(0% 14%, 100% 0%, 100% 100%, 22% 92%, 22% 70%, 0% 70%)',
+          },
         },
       ],
     },
@@ -185,6 +223,50 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
           direction: 'forward',
           targetZoneId: 'zone_lecturezone_open_space_1',
           targetSceneId: 'zone_open_space_1_start',
+        },
+        {
+          id: 'link_os1_2_to_gr2',
+          label: 'Game Room 2 · Foosball',
+          x_percent: 47.8,
+          y_percent: 40.0,
+          direction: 'door',
+          targetZoneId: 'zone_gameroom_2',
+          targetSceneId: 'zone_gameroom_2',
+          lockedFrame: {
+            left_percent: 46.5,
+            top_percent: 32.0,
+            width_percent: 2.8,
+            height_percent: 16.0,
+          },
+        },
+        {
+          id: 'link_os1_2_to_gr3',
+          label: 'Game Room 3 · Table Tennis',
+          x_percent: 50.8,
+          y_percent: 40.0,
+          direction: 'door',
+          targetZoneId: 'zone_gameroom_3',
+          targetSceneId: 'zone_gameroom_3',
+          lockedFrame: {
+            left_percent: 49.7,
+            top_percent: 29.0,
+            width_percent: 2.3,
+            height_percent: 22.0,
+          },
+        },
+        {
+          id: 'link_os1_2_to_gr4',
+          label: 'Game Room 4 · PlayStation',
+          x_percent: 54.1,
+          y_percent: 40.0,
+          direction: 'door',
+          targetZoneId: 'zone_gameroom_4',
+          lockedFrame: {
+            left_percent: 52.3,
+            top_percent: 18.0,
+            width_percent: 3.6,
+            height_percent: 42.0,
+          },
         },
       ],
     },
@@ -1013,6 +1095,178 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
       ],
     },
   ],
+  zone_gameroom_1: [
+    {
+      id: 'zone_gameroom_1',
+      label: 'Game Room 1 · Board Games',
+      imageUrl: '/assets/rooms/zone_gameroom_1.jpg',
+      is360: true,
+      hotspots: [
+        {
+          id: 'hs_gr1_table_games',
+          zone_id: 'zone_gameroom_1',
+          category: 'GAME_TABLE',
+          x_percent: 34.8,
+          y_percent: 82.0,
+          title: 'Table Games · Board Games',
+          content:
+            'Board games collection including Monopoly, Tabu, Jenga, and strategy card games for team breaks.',
+          is_claimed: false,
+        },
+      ],
+      links: [
+        {
+          id: 'link_gr1_to_gr2',
+          label: 'Game Room 2 · Foosball',
+          x_percent: 43.5,
+          y_percent: 72.0,
+          direction: 'forward',
+          targetZoneId: 'zone_gameroom_2',
+          targetSceneId: 'zone_gameroom_2',
+          lockedFrame: {
+            left_percent: 41.4,
+            top_percent: 32.0,
+            width_percent: 6.2,
+            height_percent: 24.5,
+          },
+        },
+        {
+          id: 'link_gr1_to_os1_start',
+          label: 'Open Space 1 Start',
+          x_percent: 79.2,
+          y_percent: 45.0,
+          direction: 'door',
+          targetZoneId: 'zone_lecturezone_open_space_1',
+          targetSceneId: 'zone_open_space_1_start',
+        },
+      ],
+    },
+  ],
+  zone_gameroom_2: [
+    {
+      id: 'zone_gameroom_2',
+      label: 'Game Room 2 · Foosball & Air Hockey',
+      imageUrl: '/assets/rooms/zone_gameroom_2.jpg',
+      is360: true,
+      hotspots: [
+        {
+          id: 'hs_gr2_air_hockey',
+          zone_id: 'zone_gameroom_2',
+          category: 'GAME_TABLE',
+          x_percent: 16.5,
+          y_percent: 76.0,
+          title: 'Air Hockey Table',
+          content:
+            'High-speed arcade air hockey table with electronic score counter.',
+          is_claimed: false,
+        },
+        {
+          id: 'hs_gr2_foosball',
+          zone_id: 'zone_gameroom_2',
+          category: 'GAME_TABLE',
+          x_percent: 92.5,
+          y_percent: 62.0,
+          title: 'Foosball Table',
+          content:
+            'Tournament-grade table football setup for 1v1 and 2v2 matches.',
+          is_claimed: false,
+        },
+      ],
+      links: [
+        {
+          id: 'link_gr2_to_gr3',
+          label: 'Game Room 3 · Table Tennis',
+          x_percent: 11.2,
+          y_percent: 66.0,
+          direction: 'forward',
+          targetZoneId: 'zone_gameroom_3',
+          targetSceneId: 'zone_gameroom_3',
+          lockedFrame: {
+            left_percent: 7.6,
+            top_percent: 14.0,
+            width_percent: 9.2,
+            height_percent: 35.0,
+          },
+        },
+        {
+          id: 'link_gr2_to_gr1',
+          label: 'Game Room 1 · Board Games',
+          x_percent: 54.0,
+          y_percent: 89.0,
+          direction: 'forward',
+          targetZoneId: 'zone_gameroom_1',
+          targetSceneId: 'zone_gameroom_1',
+          lockedFrame: {
+            left_percent: 53.0,
+            top_percent: 28.0,
+            width_percent: 15.0,
+            height_percent: 46.0,
+          },
+        },
+      ],
+    },
+  ],
+  zone_gameroom_3: [
+    {
+      id: 'zone_gameroom_3',
+      label: 'Game Room 3 · Table Tennis',
+      imageUrl: '/assets/rooms/zone_gameroom_3.jpg',
+      is360: true,
+      hotspots: [
+        {
+          id: 'hs_gr3_table_tennis',
+          zone_id: 'zone_gameroom_3',
+          category: 'GAME_TABLE',
+          x_percent: 67.5,
+          y_percent: 76.0,
+          title: 'Table Tennis',
+          content:
+            'Regulation-size indoor ping-pong table. Paddles and balls are available on the side rack.',
+          is_claimed: false,
+        },
+      ],
+      links: [
+        {
+          id: 'link_gr3_to_gr4',
+          label: 'Game Room 4 · PlayStation',
+          x_percent: 28.0,
+          y_percent: 84.0,
+          direction: 'forward',
+          targetZoneId: 'zone_gameroom_4',
+          lockedFrame: {
+            left_percent: 20.6,
+            top_percent: 14.0,
+            width_percent: 13.8,
+            height_percent: 64.0,
+          },
+        },
+        {
+          id: 'link_gr3_to_os1_2',
+          label: 'Open Space 1_2',
+          x_percent: 38.2,
+          y_percent: 45.0,
+          direction: 'door',
+          targetZoneId: 'zone_lecturezone_open_space_1',
+          targetSceneId: 'zone_open_space_1_2',
+        },
+        {
+          id: 'link_gr3_to_gr2',
+          label: 'Game Room 2 · Foosball',
+          x_percent: 60.0,
+          y_percent: 90.0,
+          direction: 'forward',
+          targetZoneId: 'zone_gameroom_2',
+          targetSceneId: 'zone_gameroom_2',
+          lockedFrame: {
+            left_percent: 56.8,
+            top_percent: 34.0,
+            width_percent: 7.0,
+            height_percent: 21.5,
+          },
+        },
+      ],
+    },
+  ],
 }
 
 export function resolveRoomScenes(
@@ -1072,7 +1326,17 @@ export function resolveRoomScenes(
               targetZoneId: 'zone_open_space_2',
               targetSceneId: 'zone_open_space_2_5',
             }
-          : zoneId === 'zone_meeting_1'
+          : zoneId === 'zone_gameroom_4'
+            ? {
+                id: `${zoneId}_back`,
+                label: 'Exit to Game Room 3',
+                x_percent: 48.0,
+                y_percent: 78.0,
+                direction: 'door',
+                targetZoneId: 'zone_gameroom_3',
+                targetSceneId: 'zone_gameroom_3',
+              }
+            : zoneId === 'zone_meeting_1'
             ? {
                 id: `${zoneId}_back`,
                 label: 'Exit to Open Space 1',

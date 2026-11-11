@@ -101,7 +101,7 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
       }))
       setProgress(updatedProgress)
       setSelectedQuestZoneId(null)
-      setSelectedRoomZoneId(unlockedZone.id)
+      setSelectedRoomZoneId((prevRoomId) => prevRoomId ?? unlockedZone.id)
       notify(
         'achievement',
         `Zone Unlocked: ${unlockedZone.name}`,

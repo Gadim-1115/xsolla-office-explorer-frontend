@@ -13,6 +13,7 @@ import {
   Headphones,
   ExternalLink,
   Package,
+  Gamepad2,
 } from 'lucide-react'
 import type { HotspotDTO } from '../../../shared/types/api.types'
 
@@ -59,6 +60,8 @@ export function EquipmentHotspot({
         return <Headphones className="h-4 w-4 text-[#80EAFF]" />
       case 'STOCK':
         return <Package className="h-4 w-4 text-[#80EAFF]" />
+      case 'GAME_TABLE':
+        return <Gamepad2 className="h-4 w-4 text-[#80EAFF]" />
       case 'VIEWPOINT':
         return <Eye className="h-4 w-4 text-[#80EAFF]" />
       default:

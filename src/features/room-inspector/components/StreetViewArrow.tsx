@@ -26,6 +26,42 @@ export function StreetViewArrow({
           ? 45
           : 0
 
+  if (isLocked && link.lockedFrame) {
+    return (
+      <div
+        style={{
+          left: `${link.lockedFrame.left_percent}%`,
+          top: `${link.lockedFrame.top_percent}%`,
+          width: `${link.lockedFrame.width_percent}%`,
+          height: `${link.lockedFrame.height_percent}%`,
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          clipPath: link.lockedFrame.clipPath,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          onNavigate(link)
+        }}
+        title={`${link.label} (Locked)`}
+        className="absolute z-10 flex items-center justify-center rounded-2xl cursor-pointer select-none transition-all duration-200"
+      >
+        <div
+          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-medium text-white/85 backdrop-blur-xs transition-all duration-200 ${
+            isHovered
+              ? 'bg-black/60 scale-105'
+              : 'bg-black/30 opacity-75'
+          }`}
+        >
+          <Lock className="h-3.5 w-3.5 shrink-0 text-white/90" />
+          {!compact && isHovered && <span>{link.label}</span>}
+        </div>
+      </div>
+    )
+  }
+
   if (isLocked || link.direction === 'door') {
     return (
       <div
