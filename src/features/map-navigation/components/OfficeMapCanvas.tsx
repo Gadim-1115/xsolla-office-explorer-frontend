@@ -105,7 +105,9 @@ export function OfficeMapCanvas() {
         minScale={0.65}
         maxScale={3.5}
         centerOnInit
-        wheel={{ step: 0.12 }}
+        // smooth mode (the library default) multiplies step by the wheel's deltaY (~100 per mouse
+        // notch), so 0.002 = +0.2 zoom per notch; 0.12 jumped straight to maxScale on one notch
+        wheel={{ step: 0.002 }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
