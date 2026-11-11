@@ -210,13 +210,7 @@ export function RoomModal() {
   const atmosphereClass = getRoomAtmosphereGradient(zone.id)
 
   const handleOpenSystemModal = (hotspot: HotspotDTO) => {
-    if (
-      hotspot.category === 'MONITOR' &&
-      EXTERNAL_INTEGRATION_URLS.WEEKLY_SCHEDULE_URL
-    ) {
-      window.open(EXTERNAL_INTEGRATION_URLS.WEEKLY_SCHEDULE_URL, '_blank')
-      return
-    }
+    // MONITOR boards always show the pop-up first: it explains which calendar opens and why
     if (hotspot.category === 'DESK' && EXTERNAL_INTEGRATION_URLS.LMS_TASKS_URL) {
       window.open(EXTERNAL_INTEGRATION_URLS.LMS_TASKS_URL, '_blank')
       return
@@ -716,7 +710,7 @@ export function RoomModal() {
         }
         subtitle={
           systemModalHotspot?.category === 'MONITOR'
-            ? 'External Weekly Schedule System Integration Placeholder'
+            ? 'LMS lectures and events, in your Google Calendar'
             : 'External Xsolla School LMS Tasks Integration Placeholder'
         }
         maxWidthClass="max-w-xl"
@@ -736,30 +730,20 @@ export function RoomModal() {
             </div>
 
             {systemModalHotspot.category === 'MONITOR' ? (
-              <div className="rounded-[6px] border border-[#2F4045] bg-[#1B2628] p-4 text-xs text-white space-y-2">
-                <div className="flex items-center justify-between border-b border-[#2F4045] pb-2 font-bold text-white">
-                  <span>Day / Time</span>
-                  <span>Session / Room Booking</span>
-                </div>
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-[#9DB0B4]">Mon · 10:00 – 12:00</span>
-                  <span className="font-medium">Go Clean Architecture Lecture & Review</span>
-                </div>
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-[#9DB0B4]">Wed · 14:00 – 16:00</span>
-                  <span className="font-medium">React & TypeScript Frontend Workshop</span>
-                </div>
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-[#9DB0B4]">Fri · 16:00 – 18:00</span>
-                  <span className="font-medium">Sprint Demo & Team Retrospective</span>
-                </div>
-                <p className="pt-2 text-[11px] text-[#9DB0B4]">
-                  Connect live API or set{' '}
-                  <code className="text-[#80EAFF] font-semibold">
-                    EXTERNAL_INTEGRATION_URLS.WEEKLY_SCHEDULE_URL
-                  </code>{' '}
-                  in <code className="text-[#80EAFF] font-semibold">roomScenes.ts</code>.
+              <div className="rounded-[6px] border border-[#2F4045] bg-[#1B2628] p-4 text-sm text-white flex flex-col gap-3">
+                <p className="text-[#9DB0B4] text-xs leading-relaxed">
+                  When a lecturer adds a lecture or event in the LMS and shares it to Google Calendar,
+                  every student in that module gets an invitation. Open your calendar to see this week.
+                  Use the Google account your LMS account is registered with.
                 </p>
+                <a
+                  href={EXTERNAL_INTEGRATION_URLS.WEEKLY_SCHEDULE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-[6px] bg-[#80EAFF] px-4 py-2.5 text-sm font-bold text-[#0D1A1D] hover:bg-[#A6F1FF] transition"
+                >
+                  Open my Google Calendar
+                </a>
               </div>
             ) : (
               <div className="rounded-[6px] border border-[#2F4045] bg-[#1B2628] p-4 text-xs text-white space-y-2">

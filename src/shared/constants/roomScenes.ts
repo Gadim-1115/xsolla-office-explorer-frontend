@@ -1,7 +1,10 @@
 import type { HotspotDTO } from '../types/api.types'
 
 export const EXTERNAL_INTEGRATION_URLS = {
-  WEEKLY_SCHEDULE_URL: '',
+  // Smart boards (MONITOR hotspots) open the student's own Google Calendar. The LMS backend
+  // copies events created with sync_to_google into it (students are invited as guests).
+  // Switch to the LMS calendar page once the LMS frontend is connected to its backend.
+  WEEKLY_SCHEDULE_URL: 'https://calendar.google.com/calendar/r/week',
   LMS_TASKS_URL: '',
 }
 
