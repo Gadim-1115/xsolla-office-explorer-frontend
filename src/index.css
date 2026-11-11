@@ -54,6 +54,15 @@ code, pre, .font-mono {
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* rows that scroll sideways on phones (room toolbar, photo buttons): no visible scrollbar */
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @keyframes roomDiveIn {
   0% {
     opacity: 0;

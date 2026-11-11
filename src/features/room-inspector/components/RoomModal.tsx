@@ -248,7 +248,9 @@ export function RoomModal() {
     }, 300)
   }
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Pointer events cover mouse, touch and pen; the stage has touch-none so a finger drag turns
+  // the view instead of scrolling the page.
+  const handlePointerDown = (e: React.PointerEvent) => {
     setIsDragging(true)
     dragStart.current = {
       x: e.clientX,
@@ -258,7 +260,7 @@ export function RoomModal() {
     }
   }
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging || !is360Mode) return
     const dx = e.clientX - dragStart.current.x
     const dy = e.clientY - dragStart.current.y
@@ -279,7 +281,7 @@ export function RoomModal() {
     })
   }
 
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     setIsDragging(false)
   }
 
@@ -293,7 +295,7 @@ export function RoomModal() {
   const trackShiftPercent = shiftInTile * 50
 
   return (
-    <div className={`fixed inset-0 flex flex-col bg-[#0F1719] animate-room-dive-in select-none overflow-hidden ${immersive ? 'top-0 z-[60]' : 'top-[65px] z-40'}`}>
+    <div className={`fixed inset-0 flex flex-col bg-[#0F1719] animate-room-dive-in select-none overflow-hidden ${immersive ? 'top-0 z-[60]' : 'top-[var(--explorer-header-h,65px)] z-40'}`}>
       <img
         key={currentUrl}
         src={currentUrl}
@@ -315,29 +317,37 @@ export function RoomModal() {
         }
       />
 
-      <div className={`absolute top-5 left-6 right-6 z-30 flex flex-wrap items-center justify-between gap-4 pointer-events-none ${immersive ? 'hidden' : ''}`}>
-        <div className="flex flex-wrap items-center gap-3 pointer-events-auto">
+      {/* Below lg: one solid two-row bar (back · room · photo switcher, then the toolbar);
+          the floating chips wrap into a messy stack there. lg+: the floating chips, as before. */}
+      <div className={`absolute top-0 left-0 right-0 z-30 flex flex-wrap items-center justify-between border-b border-[#2F4045] bg-[#141E20]/95 backdrop-blur-md pointer-events-auto lg:top-5 lg:left-6 lg:right-6 lg:gap-4 lg:border-0 lg:bg-transparent lg:backdrop-blur-none lg:pointer-events-none ${immersive ? 'hidden' : ''}`}>
+        <div className="flex w-full min-w-0 items-center gap-2 px-2 py-2 pointer-events-auto sm:px-4 lg:w-auto lg:flex-wrap lg:gap-3 lg:p-0">
           <button
             type="button"
             onClick={closeRoomModal}
-            className="flex items-center gap-2 rounded-[6px] bg-[#80EAFF] px-4 py-2.5 text-xs font-bold text-[#0D1A1D] shadow-md hover:bg-[#A6F1FF] transition-all cursor-pointer"
+            aria-label="Back to 31st-Floor Map"
+            title="Back to 31st-Floor Map"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-[#80EAFF] text-xs font-bold text-[#0D1A1D] shadow-md hover:bg-[#A6F1FF] transition-all cursor-pointer sm:h-auto sm:w-auto sm:justify-start sm:gap-2 sm:px-4 sm:py-2.5"
           >
             <ArrowLeft className="h-4 w-4 stroke-[2.5]" />
-            Back to 31st-Floor Map
+            <span className="hidden sm:inline">Back to 31st-Floor Map</span>
           </button>
 
-          <div className="rounded-lg border border-[#2F4045] bg-[#233134]/95 px-4 py-2 shadow-md text-left backdrop-blur-md">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#80EAFF]" />
-              <h2 className="text-sm font-bold text-white">{zone.name}</h2>
-              <span className="rounded-[4px] bg-[#153640] border border-[#80EAFF]/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#80EAFF]">
+          <div className="min-w-0 flex-1 text-left lg:flex-none lg:rounded-lg lg:border lg:border-[#2F4045] lg:bg-[#233134]/95 lg:px-4 lg:py-2 lg:shadow-md lg:backdrop-blur-md">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[#80EAFF]" />
+              <h2 className="truncate text-sm font-bold text-white">
+                {/* phones drop the bracketed part: "Open Space 1 (Xsolla School Students)" -> "Open Space 1" */}
+                <span className="sm:hidden">{zone.name.replace(/\s*\([^)]*\)\s*$/, '')}</span>
+                <span className="hidden sm:inline">{zone.name}</span>
+              </h2>
+              <span className="hidden shrink-0 rounded-[4px] bg-[#153640] border border-[#80EAFF]/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#80EAFF] sm:inline">
                 {is360Mode ? '360° Panorama' : 'Room Photo'}
               </span>
             </div>
           </div>
 
           {scenes.length > 1 && (
-            <div className="flex items-center gap-1 rounded-lg border border-[#2F4045] bg-[#233134]/95 p-1 shadow-md backdrop-blur-md">
+            <div className="flex shrink-0 items-center gap-1 lg:rounded-lg lg:border lg:border-[#2F4045] lg:bg-[#233134]/95 lg:p-1 lg:shadow-md lg:backdrop-blur-md">
               <button
                 type="button"
                 onClick={() =>
@@ -363,18 +373,22 @@ export function RoomModal() {
           )}
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-[#2F4045] bg-[#233134]/95 px-3.5 py-2 text-xs text-white shadow-md backdrop-blur-md">
+        <div className="pointer-events-auto flex w-full items-center justify-between gap-1.5 overflow-x-auto scrollbar-none border-t border-[#2F4045] px-3 py-1.5 text-xs text-white sm:justify-start sm:gap-2 sm:px-4 lg:w-auto lg:max-w-full lg:rounded-lg lg:border lg:bg-[#233134]/95 lg:px-3.5 lg:py-2 lg:shadow-md lg:backdrop-blur-md">
           {is360Mode && (
             <>
-              <Compass className="h-4 w-4 text-[#80EAFF]" />
-              <span className="font-mono text-[11px] font-bold text-white w-10">
-                {Math.round(normalizedYaw)}°
+              <span className="flex shrink-0 items-center gap-1.5">
+                <Compass className="h-4 w-4 shrink-0 text-[#80EAFF]" />
+                <span className="w-10 shrink-0 font-mono text-[11px] font-bold text-white">
+                  {Math.round(normalizedYaw)}°
+                </span>
               </span>
 
               <button
                 type="button"
                 onClick={() => setAutoRotate((v) => !v)}
-                className={`flex items-center gap-1 rounded-[6px] px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
+                title="360° Spin"
+                aria-label="360° Spin"
+                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[6px] px-2.5 py-2 text-[11px] font-semibold transition cursor-pointer sm:py-1 ${
                   autoRotate
                     ? 'bg-[#80EAFF] text-[#0D1A1D]'
                     : 'bg-[#2F4045] text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D]'
@@ -385,7 +399,7 @@ export function RoomModal() {
                 ) : (
                   <Play className="h-3 w-3" />
                 )}
-                360° Spin
+                <span className="hidden sm:inline">360° Spin</span>
               </button>
             </>
           )}
@@ -395,7 +409,7 @@ export function RoomModal() {
             onClick={() =>
               setFovZoom((z) => Math.min(2.1, Number((z + 0.2).toFixed(2))))
             }
-            className="rounded-[6px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
+            className="shrink-0 rounded-[6px] bg-[#2F4045] p-2 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer sm:p-1.5"
             title="Zoom In"
           >
             <ZoomIn className="h-3.5 w-3.5" />
@@ -406,7 +420,7 @@ export function RoomModal() {
             onClick={() =>
               setFovZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))
             }
-            className="rounded-[6px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
+            className="shrink-0 rounded-[6px] bg-[#2F4045] p-2 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer sm:p-1.5"
             title="Zoom Out"
           >
             <ZoomOut className="h-3.5 w-3.5" />
@@ -419,7 +433,7 @@ export function RoomModal() {
               setPitchDeg(0)
               setFovZoom(1)
             }}
-            className="rounded-[6px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
+            className="shrink-0 rounded-[6px] bg-[#2F4045] p-2 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer sm:p-1.5"
             title="Reset View"
           >
             <RotateCw className="h-3.5 w-3.5" />
@@ -428,7 +442,7 @@ export function RoomModal() {
           <button
             type="button"
             onClick={enterImmersive}
-            className="rounded-[6px] bg-[#2F4045] p-1.5 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
+            className="shrink-0 rounded-[6px] bg-[#2F4045] p-2 text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer sm:p-1.5"
             title="Full screen"
           >
             <Maximize2 className="h-3.5 w-3.5" />
@@ -437,7 +451,8 @@ export function RoomModal() {
           <button
             type="button"
             onClick={() => setCalibrateMode((v) => !v)}
-            className={`flex items-center gap-1 rounded-[6px] px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
+            // pin-placement helper for the team: it reads the mouse position, so desktop only
+            className={`hidden shrink-0 items-center gap-1 whitespace-nowrap rounded-[6px] px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer md:flex ${
               calibrateMode
                 ? 'bg-[#80EAFF] text-[#0D1A1D]'
                 : 'bg-[#2F4045] text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D]'
@@ -465,12 +480,13 @@ export function RoomModal() {
 
       <div
         ref={stageRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerUp}
         onWheel={handleWheel}
-        className={`relative flex-1 w-full overflow-hidden ${
+        className={`relative flex-1 w-full overflow-hidden touch-none ${
           is360Mode
             ? isDragging
               ? 'cursor-grabbing'
@@ -646,28 +662,32 @@ export function RoomModal() {
         )}
       </div>
 
-      <div className={`z-30 flex flex-wrap items-center justify-between gap-4 border-t border-[#2F4045] bg-[#233134] px-6 py-3 ${immersive ? 'hidden' : ''}`}>
+      <div className={`z-30 flex flex-wrap items-center justify-between gap-2 border-t border-[#2F4045] bg-[#233134] px-3 py-2 sm:gap-4 sm:px-6 sm:py-3 ${immersive ? 'hidden' : ''}`}>
         <div className="flex items-center gap-3 text-left">
-          <Info className="h-4 w-4 shrink-0 text-[#80EAFF]" />
-          <p className="text-xs text-[#9DB0B4]">
+          <Info className="hidden h-4 w-4 shrink-0 text-[#80EAFF] sm:block" />
+          <p className="line-clamp-2 text-xs text-[#9DB0B4] sm:line-clamp-none">
             <span className="font-bold text-white">{zone.name}:</span>{' '}
-            {zone.description} ·{' '}
-            <span className="font-semibold text-[#80EAFF]">
-              Click floor arrows to walk through the office or hover pins for details
+            {zone.description}
+            {/* the hint mentions hovering, which phones cannot do */}
+            <span className="hidden md:inline">
+              {' · '}
+              <span className="font-semibold text-[#80EAFF]">
+                Click floor arrows to walk through the office or hover pins for details
+              </span>
             </span>
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex max-w-full flex-wrap items-center gap-2">
           {scenes.length > 1 && (
-            <div className="flex items-center gap-1.5 mr-2 border-r border-[#2F4045] pr-3">
-              <Images className="h-3.5 w-3.5 text-[#80EAFF]" />
+            <div className="flex max-w-full items-center gap-1.5 overflow-x-auto scrollbar-none sm:mr-2 sm:border-r sm:border-[#2F4045] sm:pr-3">
+              <Images className="h-3.5 w-3.5 shrink-0 text-[#80EAFF]" />
               {scenes.map((scene, idx) => (
                 <button
                   key={scene.id}
                   type="button"
                   onClick={() => setActiveSceneIndex(idx)}
-                  className={`rounded-[6px] px-3 py-1 text-xs font-semibold transition cursor-pointer ${
+                  className={`shrink-0 whitespace-nowrap rounded-[6px] px-3 py-1 text-xs font-semibold transition cursor-pointer ${
                     safeIndex === idx
                       ? 'bg-[#80EAFF] text-[#0D1A1D]'
                       : 'bg-[#2F4045] text-white hover:bg-[#3B5157]'
@@ -679,7 +699,7 @@ export function RoomModal() {
             </div>
           )}
 
-          <span className="flex items-center gap-1.5 text-xs font-medium text-[#9DB0B4]">
+          <span className="hidden items-center gap-1.5 text-xs font-medium text-[#9DB0B4] sm:flex">
             <Sparkles className="h-3.5 w-3.5 text-[#80EAFF]" />
             Spot hidden Xsolla logos in the 360° view
           </span>
