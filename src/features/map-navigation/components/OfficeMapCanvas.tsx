@@ -12,7 +12,8 @@ import {
 } from '../../../shared/constants/mapIds'
 import type { HotspotDTO } from '../../../shared/types/api.types'
 
-const MAP_WIDTH = 'min(141vw, calc((100vh - 65px) * 2.64))'
+// --explorer-header-h is set by ProgressHeader (the header wraps to two rows on small screens)
+const MAP_WIDTH = 'min(141vw, calc((100dvh - var(--explorer-header-h, 65px)) * 2.64))'
 
 const STOCK_INFO_HOTSPOT: HotspotDTO = {
   id: 'info_stock',
@@ -105,11 +106,13 @@ export function OfficeMapCanvas() {
         minScale={0.65}
         maxScale={3.5}
         centerOnInit
-        wheel={{ step: 0.12 }}
+        // smooth mode (the library default) multiplies step by the wheel's deltaY (~100 per mouse
+        // notch), so 0.002 = +0.2 zoom per notch; 0.12 jumped straight to maxScale on one notch
+        wheel={{ step: 0.002 }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
-            <div className="absolute top-4 left-4 z-20 flex flex-col items-start gap-2">
+            <div className="absolute top-3 left-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-col items-start gap-2 sm:top-4 sm:left-4">
               <button
                 type="button"
                 onClick={() => setLegendOpen((v) => !v)}
@@ -152,7 +155,7 @@ export function OfficeMapCanvas() {
               )}
             </div>
 
-            <div className="absolute bottom-5 left-5 z-20 flex items-center gap-1.5 rounded-xl border border-[#2F4045] bg-[#233134] p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.08)]">
+            <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 sm:bottom-5 sm:left-5 rounded-xl border border-[#2F4045] bg-[#233134] p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.08)]">
               <button
                 type="button"
                 onClick={() => zoomIn()}
@@ -219,10 +222,10 @@ export function OfficeMapCanvas() {
                       e.stopPropagation()
                       triggerZoneClick(entrance.targetZoneId, entrance.targetSceneId)
                     }}
-                    className="group absolute -translate-x-1/2 -translate-y-1/2 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-[#80EAFF]/70 bg-[#80EAFF] text-[#0D1A1D] shadow-[0_0_0_6px_rgba(128,234,255,0.15)] hover:scale-125 hover:bg-[#A6F1FF] transition-all cursor-pointer"
+                    className="group absolute -translate-x-1/2 -translate-y-1/2 z-30 flex h-7 w-7 items-center justify-center rounded-full border border-[#80EAFF]/70 bg-[#80EAFF] text-[#0D1A1D] shadow-[0_0_0_4px_rgba(128,234,255,0.15)] hover:scale-125 hover:bg-[#A6F1FF] transition-all cursor-pointer sm:h-10 sm:w-10 sm:shadow-[0_0_0_6px_rgba(128,234,255,0.15)]"
                     title={entrance.label}
                   >
-                    <DoorOpen className="h-5 w-5 shrink-0 stroke-[2.2]" />
+                    <DoorOpen className="h-4 w-4 shrink-0 stroke-[2.2] sm:h-5 sm:w-5" />
                   </button>
                 ))}
                 {mapHotspots
