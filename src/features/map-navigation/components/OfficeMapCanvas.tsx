@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { ZoomIn, ZoomOut, Maximize2, Lock, Unlock, DoorOpen, Info, X } from 'lucide-react'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
@@ -12,8 +12,8 @@ import {
 } from '../../../shared/constants/mapIds'
 import type { HotspotDTO } from '../../../shared/types/api.types'
 
-// --explorer-header-h is set by ProgressHeader (the header wraps to two rows on small screens)
 const MAP_WIDTH = 'min(141vw, calc((100dvh - var(--explorer-header-h, 65px)) * 2.64))'
+const DRAG_THRESHOLD_PX = 5
 
 const STOCK_INFO_HOTSPOT: HotspotDTO = {
   id: 'info_stock',
@@ -41,10 +41,17 @@ export function OfficeMapCanvas() {
 
   const [divingZoneId, setDivingZoneId] = useState<string | null>(null)
   const [legendOpen, setLegendOpen] = useState<boolean>(false)
+  const pointerDownPos = useRef<{ x: number; y: number } | null>(null)
+  const wasDragged = useRef<boolean>(false)
 
   const hoveredZone = hoveredZoneId ? zones[hoveredZoneId] : null
 
   const triggerZoneClick = (zoneId: string, sceneId?: string) => {
+    if (wasDragged.current) {
+      wasDragged.current = false
+      return
+    }
+
     const zone = zones[zoneId]
     if (!zone) return
 
@@ -65,6 +72,14 @@ export function OfficeMapCanvas() {
         setDivingZoneId(null)
       }, 250)
     }, 850)
+  }
+
+  const handleSelectHotspot = (hotspot: HotspotDTO) => {
+    if (wasDragged.current) {
+      wasDragged.current = false
+      return
+    }
+    openMapHotspot(hotspot)
   }
 
   const divePos = divingZoneId ? ZONE_LABEL_POSITIONS[divingZoneId] : null
@@ -106,9 +121,10 @@ export function OfficeMapCanvas() {
         minScale={0.65}
         maxScale={3.5}
         centerOnInit
-        // smooth mode (the library default) multiplies step by the wheel's deltaY (~100 per mouse
-        // notch), so 0.002 = +0.2 zoom per notch; 0.12 jumped straight to maxScale on one notch
         wheel={{ step: 0.002 }}
+        onPanning={() => {
+          wasDragged.current = true
+        }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
@@ -196,7 +212,32 @@ export function OfficeMapCanvas() {
                   transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
                   left: '-4.95%',
                 }}
-                className={`relative h-full w-full max-w-none transition-all ${
+                onPointerDownCapture={(e) => {
+                  pointerDownPos.current = { x: e.clientX, y: e.clientY }
+                  wasDragged.current = false
+                }}
+                onPointerMoveCapture={(e) => {
+                  if (!pointerDownPos.current) return
+                  const dx = e.clientX - pointerDownPos.current.x
+                  const dy = e.clientY - pointerDownPos.current.y
+                  if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
+                    wasDragged.current = true
+                  }
+                }}
+                onPointerUpCapture={() => {
+                  pointerDownPos.current = null
+                }}
+                onPointerCancelCapture={() => {
+                  pointerDownPos.current = null
+                }}
+                onClickCapture={(e) => {
+                  if (wasDragged.current) {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    wasDragged.current = false
+                  }
+                }}
+                className={`relative h-full w-full max-w-none cursor-grab active:cursor-grabbing transition-all ${
                   divingZoneId
                     ? 'scale-[3.1] opacity-10 blur-[4px]'
                     : !selectedRoomZoneId
@@ -234,7 +275,7 @@ export function OfficeMapCanvas() {
                     <MapHotspotPin
                       key={hotspot.id}
                       hotspot={hotspot}
-                      onSelect={openMapHotspot}
+                      onSelect={handleSelectHotspot}
                     />
                   ))}
               </div>

@@ -151,15 +151,31 @@ export function LmsSurfaceModal({ hotspot, onClose }: LmsSurfaceModalProps) {
 
   useEffect(() => {
     if (!hotspot || !surfaceCategory) return
+    const currentUser = getLmsUser()
+    const canGrades = checkLmsPermission(currentUser, 'GRADES').allowed
+    const canTasks = checkLmsPermission(currentUser, 'DESK').allowed
     setTaskFilter('all')
     setEventFilter('all')
-    setDeskTab(surfaceCategory === 'GRADES' ? 'grades' : 'tasks')
+    if (surfaceCategory === 'GRADES' && canGrades) {
+      setDeskTab('grades')
+    } else if (surfaceCategory === 'DESK' && canTasks) {
+      setDeskTab('tasks')
+    } else if (canGrades) {
+      setDeskTab('grades')
+    } else {
+      setDeskTab('tasks')
+    }
   }, [hotspot, surfaceCategory])
 
   useEffect(() => {
     if (!hotspot || !surfaceCategory) return
 
     const user = getLmsUser()
+    if (!user) {
+      redirectToLmsLogin(false)
+      return
+    }
+
     const checkCategory: LmsSurfaceCategory =
       surfaceCategory === 'DESK' || surfaceCategory === 'GRADES'
         ? deskTab === 'grades'
@@ -169,7 +185,8 @@ export function LmsSurfaceModal({ hotspot, onClose }: LmsSurfaceModalProps) {
 
     const perm = checkLmsPermission(user, checkCategory)
     if (!perm.allowed) {
-      redirectToLmsLogin(perm.reason === 'forbidden')
+      setError(`This section is not available for the ${getLmsRoleLabel(user)} role.`)
+      setLoading(false)
       return
     }
 
@@ -620,6 +637,8 @@ export function LmsSurfaceModal({ hotspot, onClose }: LmsSurfaceModalProps) {
 
   const activeCategoryForUrl: LmsSurfaceCategory = deskTab === 'grades' ? 'GRADES' : 'DESK'
   const lmsDeskUrl = getLmsPageUrl(activeCategoryForUrl, user)
+  const canViewGrades = checkLmsPermission(user, 'GRADES').allowed
+  const canViewTasks = checkLmsPermission(user, 'DESK').allowed
 
   return (
     <div
@@ -649,30 +668,34 @@ export function LmsSurfaceModal({ hotspot, onClose }: LmsSurfaceModalProps) {
             </div>
 
             <div className="flex items-center gap-1 rounded-lg border border-[#2F4045] bg-[#141E20] p-0.5">
-              <button
-                type="button"
-                onClick={() => setDeskTab('grades')}
-                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-bold transition cursor-pointer ${
-                  deskTab === 'grades'
-                    ? 'bg-[#80EAFF] text-[#0D1A1D]'
-                    : 'text-[#9DB0B4] hover:text-white'
-                }`}
-              >
-                <Award className="h-3.5 w-3.5" />
-                Student Grades
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeskTab('tasks')}
-                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-bold transition cursor-pointer ${
-                  deskTab === 'tasks'
-                    ? 'bg-[#80EAFF] text-[#0D1A1D]'
-                    : 'text-[#9DB0B4] hover:text-white'
-                }`}
-              >
-                <ClipboardList className="h-3.5 w-3.5" />
-                LMS Tasks
-              </button>
+              {canViewGrades && (
+                <button
+                  type="button"
+                  onClick={() => setDeskTab('grades')}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                    deskTab === 'grades'
+                      ? 'bg-[#80EAFF] text-[#0D1A1D]'
+                      : 'text-[#9DB0B4] hover:text-white'
+                  }`}
+                >
+                  <Award className="h-3.5 w-3.5" />
+                  Student Grades
+                </button>
+              )}
+              {canViewTasks && (
+                <button
+                  type="button"
+                  onClick={() => setDeskTab('tasks')}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                    deskTab === 'tasks'
+                      ? 'bg-[#80EAFF] text-[#0D1A1D]'
+                      : 'text-[#9DB0B4] hover:text-white'
+                  }`}
+                >
+                  <ClipboardList className="h-3.5 w-3.5" />
+                  LMS Tasks
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -754,37 +777,47 @@ export function LmsSurfaceModal({ hotspot, onClose }: LmsSurfaceModalProps) {
                     <h4 className="text-xs font-bold uppercase tracking-wider text-[#80EAFF] mb-3">
                       {grades.teamName} Student Standings
                     </h4>
-                    <div className="space-y-2.5">
-                      {grades.teamMembers.map((member) => (
-                        <div
-                          key={member.studentId}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#2F4045] bg-[#141E20] px-3.5 py-2.5"
-                        >
-                          <div>
-                            <p className="text-xs font-bold text-white">{member.studentName}</p>
-                            <p className="text-[11px] text-[#9DB0B4]">{member.studentEmail}</p>
+                    {grades.teamMembers.length === 0 ? (
+                      <p className="rounded-lg border border-[#2F4045] bg-[#141E20] p-4 text-xs text-[#9DB0B4]">
+                        No students are assigned to your team yet in the LMS.
+                      </p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {grades.teamMembers.map((member) => (
+                          <div
+                            key={member.studentId}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#2F4045] bg-[#141E20] px-3.5 py-2.5"
+                          >
+                            <div>
+                              <p className="text-xs font-bold text-white">{member.studentName}</p>
+                              <p className="text-[11px] text-[#9DB0B4]">{member.studentEmail}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {member.weeks.length === 0 ? (
+                                <span className="text-[11px] text-[#9DB0B4]">No weeks rated yet</span>
+                              ) : (
+                                member.weeks.map((w) => (
+                                  <span
+                                    key={w.week}
+                                    title={`Week ${w.week}: ${STANDING_LABELS[w.effective]}`}
+                                    className={`flex h-6 w-6 items-center justify-center rounded text-[10px] font-bold ${
+                                      w.effective === 'green'
+                                        ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
+                                        : w.effective === 'yellow'
+                                          ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
+                                          : 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
+                                    }`}
+                                  >
+                                    W{w.week}
+                                  </span>
+                                ))
+                              )}
+                              {member.current && <StandingPillBadge level={member.current} small />}
+                            </div>
                           </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {member.weeks.map((w) => (
-                              <span
-                                key={w.week}
-                                title={`Week ${w.week}: ${STANDING_LABELS[w.effective]}`}
-                                className={`flex h-6 w-6 items-center justify-center rounded text-[10px] font-bold ${
-                                  w.effective === 'green'
-                                    ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
-                                    : w.effective === 'yellow'
-                                      ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
-                                      : 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
-                                }`}
-                              >
-                                W{w.week}
-                              </span>
-                            ))}
-                            {member.current && <StandingPillBadge level={member.current} small />}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>

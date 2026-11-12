@@ -76,6 +76,16 @@ export interface LmsCalendarEvent {
   moduleTitle?: string
 }
 
+export class LmsApiError extends Error {
+  public readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'LmsApiError'
+    this.status = status
+  }
+}
+
 const USER_STORAGE_KEY = 'auth_user'
 const TOKENS_STORAGE_KEY = 'auth_tokens'
 const LMS_ORIGIN_KEY = 'lms_origin'
@@ -146,10 +156,6 @@ export function captureLmsSessionFromUrl(): void {
       tokens?: unknown
       origin?: string
       apiUrl?: string
-      standings?: unknown
-      courseEdits?: unknown
-      eventEdits?: unknown
-      submissions?: unknown
     }
 
     const normalized = normalizeUser(decoded.user)
@@ -178,19 +184,6 @@ export function captureLmsSessionFromUrl(): void {
       } else {
         localStorage.removeItem(LMS_API_URL_KEY)
       }
-    }
-
-    if (decoded.standings && typeof decoded.standings === 'object') {
-      localStorage.setItem('standings', JSON.stringify(decoded.standings))
-    }
-    if (decoded.courseEdits && typeof decoded.courseEdits === 'object') {
-      localStorage.setItem('course_edits', JSON.stringify(decoded.courseEdits))
-    }
-    if (decoded.eventEdits && typeof decoded.eventEdits === 'object') {
-      localStorage.setItem('event_edits', JSON.stringify(decoded.eventEdits))
-    }
-    if (decoded.submissions && typeof decoded.submissions === 'object') {
-      localStorage.setItem('submissions', JSON.stringify(decoded.submissions))
     }
 
     url.searchParams.delete('lms_session')
@@ -243,7 +236,7 @@ export function getLmsOrigin(): string {
     const stored = localStorage.getItem(LMS_ORIGIN_KEY)
     if (stored && stored.trim()) return stored.trim().replace(/\/+$/, '')
   } catch {
-    // ignore
+    return 'http://localhost:5173'
   }
   if (typeof window !== 'undefined') {
     if (window.location.port === '5174') return 'http://localhost:5173'
@@ -259,9 +252,13 @@ export function getLmsApiUrl(): string {
     const stored = localStorage.getItem(LMS_API_URL_KEY)
     if (stored && stored.trim()) return stored.trim().replace(/\/+$/, '')
   } catch {
-    // ignore
+    return ''
   }
   return ''
+}
+
+export function isLiveLmsBackend(): boolean {
+  return Boolean(getLmsApiUrl() && getLmsTokens()?.accessToken)
 }
 
 export function hasLmsRole(user: LmsUser | null | undefined, role: LmsRole, now: Date = new Date()): boolean {
@@ -335,6 +332,10 @@ export function redirectToLmsLogin(clearExisting = false): void {
   window.location.assign(target)
 }
 
+export function redirectToLmsApp(): void {
+  window.location.assign(getLmsOrigin())
+}
+
 export function getLmsPageUrl(category: LmsSurfaceCategory, user: LmsUser | null): string {
   const origin = getLmsOrigin()
   if (!user) return getLmsLoginUrl()
@@ -355,7 +356,7 @@ async function lmsAuthedRequest<T>(path: string): Promise<T> {
   const apiUrl = getLmsApiUrl()
   const tokens = getLmsTokens()
   if (!apiUrl || !tokens?.accessToken) {
-    throw new Error('NO_LMS_BACKEND')
+    throw new LmsApiError(0, 'NO_LMS_BACKEND')
   }
 
   const doFetch = async (accessToken: string) =>
@@ -384,20 +385,63 @@ async function lmsAuthedRequest<T>(path: string): Promise<T> {
       res = await doFetch(saved.accessToken)
     } else {
       redirectToLmsLogin(true)
-      throw new Error('LMS session expired. Redirecting to Sign In...')
+      throw new LmsApiError(401, 'LMS session expired. Redirecting to Sign In...')
     }
   }
 
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 401) {
     redirectToLmsLogin(true)
-    throw new Error('Unauthorized LMS access. Redirecting to Sign In...')
+    throw new LmsApiError(401, 'LMS session expired. Redirecting to Sign In...')
   }
 
   if (!res.ok) {
-    throw new Error(`LMS API error (${res.status})`)
+    throw new LmsApiError(res.status, `LMS request failed (${res.status})`)
   }
 
   return (await res.json()) as T
+}
+
+interface RawApiModule {
+  id: number | string
+  title: string
+  description?: string | null
+  created_by?: number | string | null
+  created_at?: string
+  opens_at?: string | null
+  closes_at?: string | null
+}
+
+interface RawApiContentItem {
+  id: number | string
+  title: string
+  description?: string | null
+  position?: number
+  is_visible?: boolean
+  type: string
+  due_at?: string | null
+  children?: RawApiContentItem[]
+}
+
+interface RawApiSubmission {
+  id: number | string
+  submitted_at?: string
+  created_at?: string
+  feedback?: string | null
+  graded_at?: string | null
+}
+
+function flattenContentItems(items: RawApiContentItem[]): RawApiContentItem[] {
+  return items.flatMap((i) => [i, ...flattenContentItems(i.children ?? [])])
+}
+
+function sortApiModules(rows: RawApiModule[]): (RawApiModule & { position: number })[] {
+  return [...rows]
+    .sort(
+      (a, b) =>
+        (a.created_at ?? '').localeCompare(b.created_at ?? '') ||
+        Number(a.id) - Number(b.id),
+    )
+    .map((m, idx) => ({ ...m, position: idx + 1 }))
 }
 
 const DAY_MS = 86_400_000
@@ -568,91 +612,87 @@ function buildFallbackTasks(user: LmsUser, now: Date = new Date()): LmsTaskItem[
   })
 }
 
+async function fetchLiveTasksInternal(user: LmsUser, now: Date): Promise<LmsTaskItem[]> {
+  const rawModules = (await lmsAuthedRequest<RawApiModule[] | null>('/modules')) ?? []
+  const sorted = sortApiModules(rawModules)
+  const isStudent = isLmsStudent(user)
+  const visible = isStudent
+    ? sorted.filter((m) => !m.opens_at || new Date(m.opens_at) <= now)
+    : sorted
+
+  const allTasks: LmsTaskItem[] = []
+  await Promise.all(
+    visible.map(async (m) => {
+      let rawItems: RawApiContentItem[] = []
+      try {
+        rawItems =
+          (await lmsAuthedRequest<RawApiContentItem[] | null>(`/modules/${m.id}/content-items`)) ?? []
+      } catch {
+        rawItems = []
+      }
+      const flat = flattenContentItems(rawItems)
+      const assignments = flat.filter(
+        (i) => i.type === 'assignment' && ( !isStudent || i.is_visible !== false ) && Boolean(i.due_at),
+      )
+      await Promise.all(
+        assignments.map(async (a) => {
+          let sub: { submittedAt?: string; gradedAt?: string; feedback?: string } | undefined
+          if (isStudent) {
+            try {
+              const s = await lmsAuthedRequest<RawApiSubmission>(
+                `/modules/${m.id}/content-items/${a.id}/submissions/me`,
+              )
+              sub = {
+                submittedAt: s.submitted_at ?? s.created_at,
+                gradedAt: s.graded_at ?? undefined,
+                feedback: s.feedback ?? undefined,
+              }
+            } catch {
+              sub = undefined
+            }
+          }
+          const dueAt = a.due_at ?? dayAt(now, 7, 18)
+          const cleanDesc = (a.description ?? '').split('\n\nWhat to hand in:\n')[0].trim()
+          allTasks.push({
+            id: String(a.id),
+            moduleId: String(m.id),
+            modulePosition: m.position,
+            moduleTitle: m.title,
+            title: a.title,
+            description: cleanDesc || `Assignment for Module ${m.position}: ${m.title}`,
+            dueAt,
+            status: computeTaskStatus(dueAt, sub, now),
+            submittedAt: sub?.submittedAt,
+            gradedAt: sub?.gradedAt,
+            feedback: sub?.feedback,
+          })
+        }),
+      )
+    }),
+  )
+
+  const priority: Record<LmsTaskStatus, number> = { overdue: 0, open: 1, submitted: 2, graded: 3 }
+  return allTasks.sort((a, b) => {
+    const p = priority[a.status] - priority[b.status]
+    if (p !== 0) return p
+    return a.dueAt.localeCompare(b.dueAt)
+  })
+}
+
 export async function fetchLmsTasks(): Promise<LmsTaskItem[]> {
   const user = getLmsUser()
-  const perm = checkLmsPermission(user, 'WHITEBOARD')
-  if (!perm.allowed || !user) {
-    redirectToLmsLogin(perm.reason === 'forbidden')
+  if (!user) {
+    redirectToLmsLogin()
     throw new Error('Redirecting to LMS Sign In...')
+  }
+  const perm = checkLmsPermission(user, 'WHITEBOARD')
+  if (!perm.allowed) {
+    throw new Error(`Tasks are not available for the ${getLmsRoleLabel(user)} role.`)
   }
 
   const now = new Date()
-  if (getLmsApiUrl() && getLmsTokens()?.accessToken) {
-    interface ApiModule {
-      id: number
-      title: string
-      position: number
-      opens_at?: string | null
-    }
-    interface ApiContentItem {
-      id: number
-      module_id: number
-      type: string
-      title: string
-      body?: string
-      due_at?: string | null
-    }
-    interface ApiSubmission {
-      submitted_at?: string
-      created_at?: string
-      graded_at?: string | null
-      feedback?: string | null
-    }
-
-    const modules = await lmsAuthedRequest<ApiModule[]>('/modules')
-    const sorted = [...modules].sort((a, b) => a.position - b.position)
-    const isStudent = isLmsStudent(user)
-    const visible = isStudent
-      ? sorted.filter((m) => !m.opens_at || new Date(m.opens_at) <= now)
-      : sorted
-
-    const allTasks: LmsTaskItem[] = []
-    await Promise.all(
-      visible.map(async (m) => {
-        const items = await lmsAuthedRequest<ApiContentItem[]>(`/modules/${m.id}/content-items`)
-        const assignments = items.filter((i) => i.type === 'assignment')
-        await Promise.all(
-          assignments.map(async (a) => {
-            let sub: { submittedAt?: string; gradedAt?: string; feedback?: string } | undefined
-            if (isStudent) {
-              try {
-                const s = await lmsAuthedRequest<ApiSubmission>(
-                  `/modules/${m.id}/content-items/${a.id}/submissions/me`,
-                )
-                sub = {
-                  submittedAt: s.submitted_at ?? s.created_at,
-                  gradedAt: s.graded_at ?? undefined,
-                  feedback: s.feedback ?? undefined,
-                }
-              } catch {
-                sub = undefined
-              }
-            }
-            const dueAt = a.due_at ?? dayAt(now, 7, 18)
-            allTasks.push({
-              id: String(a.id),
-              moduleId: String(m.id),
-              modulePosition: m.position,
-              moduleTitle: m.title,
-              title: a.title,
-              description: a.body?.trim() || `Assignment for Module ${m.position}: ${m.title}`,
-              dueAt,
-              status: computeTaskStatus(dueAt, sub, now),
-              submittedAt: sub?.submittedAt,
-              gradedAt: sub?.gradedAt,
-              feedback: sub?.feedback,
-            })
-          }),
-        )
-      }),
-    )
-
-    const priority: Record<LmsTaskStatus, number> = { overdue: 0, open: 1, submitted: 2, graded: 3 }
-    return allTasks.sort((a, b) => {
-      const p = priority[a.status] - priority[b.status]
-      if (p !== 0) return p
-      return a.dueAt.localeCompare(b.dueAt)
-    })
+  if (isLiveLmsBackend()) {
+    return fetchLiveTasksInternal(user, now)
   }
 
   return buildFallbackTasks(user, now)
@@ -660,6 +700,7 @@ export async function fetchLmsTasks(): Promise<LmsTaskItem[]> {
 
 function analyseWeeks(
   rawWeeks: { week: number; level: LmsStandingLevel; assessedAt: string; note?: string }[],
+  moduleTitleMap?: Map<number, string>,
 ): {
   weeks: LmsWeekStanding[]
   current: LmsStandingLevel | null
@@ -707,7 +748,7 @@ function analyseWeeks(
     counts.total += 1
     weeks.push({
       week: r.week,
-      moduleTitle: MODULE_TITLES[r.week - 1] ?? `Module ${r.week}`,
+      moduleTitle: moduleTitleMap?.get(r.week) ?? MODULE_TITLES[r.week - 1] ?? `Module ${r.week}`,
       level: r.level,
       effective,
       escalated,
@@ -749,48 +790,74 @@ function analyseWeeks(
 
 export async function fetchLmsGrades(): Promise<LmsGradesData> {
   const user = getLmsUser()
-  const perm = checkLmsPermission(user, 'GRADES')
-  if (!perm.allowed || !user) {
-    redirectToLmsLogin(perm.reason === 'forbidden')
+  if (!user) {
+    redirectToLmsLogin()
     throw new Error('Redirecting to LMS Sign In...')
+  }
+  const perm = checkLmsPermission(user, 'GRADES')
+  if (!perm.allowed) {
+    throw new Error(`Student grades are not available for the ${getLmsRoleLabel(user)} role.`)
   }
 
   const now = new Date()
-  const tasks = await fetchLmsTasks().catch(() => buildFallbackTasks(user, now))
-  const gradedTasks = tasks.filter((t) => t.status === 'graded')
 
-  if (getLmsApiUrl() && getLmsTokens()?.accessToken) {
-    interface ApiModule {
-      id: number
-      title: string
-      position: number
-    }
+  if (isLiveLmsBackend()) {
     interface ApiEnrollment {
-      user_id: number
+      user_id: number | string
       grade?: string | null
       created_at: string
     }
+    interface ApiTeamMember {
+      id: number | string
+      name: string
+      email: string
+    }
+    interface ApiMentorTeam {
+      id: number | string
+      name: string
+      members?: ApiTeamMember[] | null
+    }
 
-    const modules = await lmsAuthedRequest<ApiModule[]>('/modules')
-    const sorted = [...modules].sort((a, b) => a.position - b.position)
+    const rawModules = (await lmsAuthedRequest<RawApiModule[] | null>('/modules')) ?? []
+    const sorted = sortApiModules(rawModules)
+    const moduleTitleMap = new Map<number, string>(sorted.map((m) => [m.position, m.title]))
+
+    const enrollmentsByWeek = await Promise.all(
+      sorted.map(async (m) => {
+        try {
+          const rows =
+            (await lmsAuthedRequest<ApiEnrollment[] | null>(`/modules/${m.id}/enrollments`)) ?? []
+          return {
+            week: m.position,
+            date: m.closes_at ?? m.created_at ?? now.toISOString(),
+            rows,
+          }
+        } catch {
+          return {
+            week: m.position,
+            date: m.closes_at ?? m.created_at ?? now.toISOString(),
+            rows: [] as ApiEnrollment[],
+          }
+        }
+      }),
+    )
 
     if (isLmsStudent(user)) {
       const rawWeeks: { week: number; level: LmsStandingLevel; assessedAt: string }[] = []
-      await Promise.all(
-        sorted.map(async (m) => {
-          const enrollments = await lmsAuthedRequest<ApiEnrollment[]>(`/modules/${m.id}/enrollments`)
-          const mine = enrollments.find((e) => e.user_id === user.id)
-          const g = mine?.grade?.toLowerCase()
-          if (g === 'green' || g === 'yellow' || g === 'red') {
-            rawWeeks.push({
-              week: m.position,
-              level: g,
-              assessedAt: mine?.created_at ?? now.toISOString(),
-            })
-          }
-        }),
-      )
-      const analysed = analyseWeeks(rawWeeks)
+      for (const w of enrollmentsByWeek) {
+        const mine = w.rows.find((e) => Number(e.user_id) === user.id)
+        const g = mine?.grade?.trim().toLowerCase()
+        if (g === 'green' || g === 'yellow' || g === 'red') {
+          rawWeeks.push({
+            week: w.week,
+            level: g,
+            assessedAt: w.date,
+          })
+        }
+      }
+      const liveTasks = await fetchLiveTasksInternal(user, now).catch(() => [] as LmsTaskItem[])
+      const gradedTasks = liveTasks.filter((t) => t.status === 'graded')
+      const analysed = analyseWeeks(rawWeeks, moduleTitleMap)
       return {
         mode: 'student',
         current: analysed.current,
@@ -801,7 +868,94 @@ export async function fetchLmsGrades(): Promise<LmsGradesData> {
         gradedTasks,
       }
     }
+
+    let teamName = 'My Team'
+    let members: { id: number; name: string; email: string }[] = []
+
+    if (canLmsMentor(user)) {
+      try {
+        const team = await lmsAuthedRequest<ApiMentorTeam>('/mentors/me/team')
+        teamName = team.name || 'Mentor Team'
+        members = (team.members ?? []).map((m) => ({
+          id: Number(m.id),
+          name: m.name,
+          email: m.email,
+        }))
+      } catch {
+        teamName = 'No Team Assigned'
+        members = []
+      }
+    } else if (isLmsAdmin(user)) {
+      try {
+        const users =
+          (await lmsAuthedRequest<{ id: number | string; name: string; email: string; roles?: string[] }[] | null>(
+            '/users',
+          )) ?? []
+        teamName = 'All Students'
+        members = users
+          .filter((u) => !u.roles || u.roles.includes('student') || u.roles.length === 0)
+          .map((u) => ({ id: Number(u.id), name: u.name, email: u.email }))
+      } catch {
+        teamName = 'Cohort Students'
+        members = []
+      }
+    }
+
+    const teamMembers: LmsTeamMemberStanding[] = members.map((member) => {
+      const rawMemberWeeks: { week: number; level: LmsStandingLevel; assessedAt: string }[] = []
+      for (const w of enrollmentsByWeek) {
+        const found = w.rows.find((e) => Number(e.user_id) === member.id)
+        const g = found?.grade?.trim().toLowerCase()
+        if (g === 'green' || g === 'yellow' || g === 'red') {
+          rawMemberWeeks.push({
+            week: w.week,
+            level: g,
+            assessedAt: w.date,
+          })
+        }
+      }
+      const analysed = analyseWeeks(rawMemberWeeks, moduleTitleMap)
+      return {
+        studentId: member.id,
+        studentName: member.name,
+        studentEmail: member.email,
+        current: analysed.current,
+        weeks: analysed.weeks,
+      }
+    })
+
+    const combinedCounts = { green: 0, yellow: 0, red: 0, total: 0 }
+    for (const m of teamMembers) {
+      if (m.current) {
+        combinedCounts[m.current] += 1
+        combinedCounts.total += 1
+      }
+    }
+
+    const overallCurrent: LmsStandingLevel | null =
+      combinedCounts.red > 0
+        ? 'red'
+        : combinedCounts.yellow > 0
+          ? 'yellow'
+          : combinedCounts.green > 0
+            ? 'green'
+            : null
+
+    return {
+      mode: 'staff',
+      current: overallCurrent,
+      counts: combinedCounts,
+      alert: null,
+      totalWeeks: sorted.length || 12,
+      weeks: [],
+      gradedTasks: [],
+      teamName,
+      teamMembers,
+    }
   }
+
+  const fallbackTasks = buildFallbackTasks(user, now)
+  const gradedTasks = fallbackTasks.filter((t) => t.status === 'graded')
 
   const defaultSamWeeks: { week: number; level: LmsStandingLevel; assessedAt: string; note?: string }[] = [
     { week: 1, level: 'green', assessedAt: dayAt(now, -28), note: 'Great start. Setup done and you reported on time.' },
@@ -884,15 +1038,14 @@ export async function fetchLmsGrades(): Promise<LmsGradesData> {
       }
     }
 
-    const samAnalysed = analyseWeeks(defaultSamWeeks)
     return {
       mode: 'staff',
       current: 'green',
       counts: combinedCounts,
       alert: null,
       totalWeeks: 12,
-      weeks: samAnalysed.weeks,
-      gradedTasks,
+      weeks: [],
+      gradedTasks: [],
       teamName,
       teamMembers,
     }
@@ -920,15 +1073,62 @@ export async function fetchLmsGrades(): Promise<LmsGradesData> {
 
 export async function fetchLmsCalendar(): Promise<LmsCalendarEvent[]> {
   const user = getLmsUser()
-  const perm = checkLmsPermission(user, 'MONITOR')
-  if (!perm.allowed || !user) {
-    redirectToLmsLogin(perm.reason === 'forbidden')
+  if (!user) {
+    redirectToLmsLogin()
     throw new Error('Redirecting to LMS Sign In...')
   }
 
   const now = new Date()
-  const tasks = await fetchLmsTasks().catch(() => buildFallbackTasks(user, now))
-  const deadlineItems: LmsCalendarEvent[] = tasks.map((t) => ({
+
+  if (isLiveLmsBackend()) {
+    interface RawApiEvent {
+      id: number | string
+      title: string
+      kind?: string | null
+      type?: string | null
+      starts_at: string
+      ends_at: string
+      all_day?: boolean
+      location?: string | null
+      meeting_url?: string | null
+      description?: string | null
+    }
+    const apiEvents = (await lmsAuthedRequest<RawApiEvent[] | null>('/events')) ?? []
+    const mapped: LmsCalendarEvent[] = apiEvents.map((e) => {
+      const rawKind = (e.kind ?? e.type ?? '').toLowerCase()
+      const kind: LmsEventKind =
+        rawKind === 'lecture' || rawKind === 'meeting' || rawKind === 'off-campus'
+          ? rawKind
+          : 'meeting'
+      return {
+        id: String(e.id),
+        title: e.title,
+        kind,
+        startsAt: e.starts_at,
+        endsAt: e.ends_at,
+        allDay: Boolean(e.all_day),
+        location: e.location || undefined,
+        meetingUrl: e.meeting_url || undefined,
+        description: e.description || undefined,
+      }
+    })
+
+    const liveTasks = await fetchLiveTasksInternal(user, now).catch(() => [] as LmsTaskItem[])
+    const deadlineItems: LmsCalendarEvent[] = liveTasks.map((t) => ({
+      id: `deadline-${t.id}`,
+      title: `Due: ${t.title}`,
+      kind: 'deadline',
+      startsAt: t.dueAt,
+      endsAt: t.dueAt,
+      moduleTitle: `Module ${t.modulePosition} · ${t.moduleTitle}`,
+      description: t.description,
+    }))
+
+    return [...mapped, ...deadlineItems].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+  }
+
+  const fallbackTasks = buildFallbackTasks(user, now)
+  const deadlineItems: LmsCalendarEvent[] = fallbackTasks.map((t) => ({
     id: `deadline-${t.id}`,
     title: `Due: ${t.title}`,
     kind: 'deadline',
@@ -937,35 +1137,6 @@ export async function fetchLmsCalendar(): Promise<LmsCalendarEvent[]> {
     moduleTitle: `Module ${t.modulePosition} · ${t.moduleTitle}`,
     description: t.description,
   }))
-
-  if (getLmsApiUrl() && getLmsTokens()?.accessToken) {
-    interface ApiEvent {
-      id: number
-      title: string
-      description?: string
-      starts_at: string
-      ends_at: string
-      type?: string | null
-      location?: string
-      meeting_url?: string
-    }
-    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
-    const to = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59).toISOString()
-    const apiEvents = await lmsAuthedRequest<ApiEvent[]>(
-      `/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-    )
-    const mapped: LmsCalendarEvent[] = apiEvents.map((e) => ({
-      id: String(e.id),
-      title: e.title,
-      kind: e.type === 'meeting' || e.type === 'off-campus' ? e.type : 'lecture',
-      startsAt: e.starts_at,
-      endsAt: e.ends_at,
-      location: e.location || undefined,
-      meetingUrl: e.meeting_url || undefined,
-      description: e.description || undefined,
-    }))
-    return [...mapped, ...deadlineItems].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
-  }
 
   const mondayOffset = -((now.getDay() + 6) % 7)
   const baseEvents: LmsCalendarEvent[] = []
@@ -1004,27 +1175,6 @@ export async function fetchLmsCalendar(): Promise<LmsCalendarEvent[]> {
       description: 'No classes — Xsolla School off-site team activity.',
     },
   )
-
-  try {
-    const rawEdits = localStorage.getItem('event_edits')
-    if (rawEdits) {
-      const edits = JSON.parse(rawEdits) as Record<string, LmsCalendarEvent | null>
-      const merged: LmsCalendarEvent[] = []
-      const seen = new Set<string>()
-      for (const ev of baseEvents) {
-        seen.add(ev.id)
-        const edited = edits[ev.id]
-        if (edited === null) continue
-        merged.push(edited ?? ev)
-      }
-      for (const [id, edited] of Object.entries(edits)) {
-        if (edited && !seen.has(id)) merged.push(edited)
-      }
-      return [...merged, ...deadlineItems].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
-    }
-  } catch {
-    // ignore
-  }
 
   return [...baseEvents, ...deadlineItems].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
 }

@@ -204,8 +204,20 @@ export function RoomModal() {
   const isImageBroken = Boolean(failedUrls[currentUrl])
   const is360Mode = currentScene.is360 !== false
 
+  const lmsUser = getLmsUser()
   const allSceneHotspots = currentScene.hotspots || []
-  const sceneEquipment = allSceneHotspots.filter((h) => h.category !== 'EASTER_EGG')
+  const sceneEquipment = allSceneHotspots.filter((h) => {
+    if (h.category === 'EASTER_EGG') return false
+    const isLmsPin =
+      h.category === 'WHITEBOARD' ||
+      h.category === 'DESK' ||
+      h.category === 'GRADES' ||
+      h.category === 'MONITOR'
+    if (isLmsPin && lmsUser) {
+      return checkLmsPermission(lmsUser, h.category as LmsSurfaceCategory).allowed
+    }
+    return true
+  })
   const easterEggs = allSceneHotspots
     .filter((h) => h.category === 'EASTER_EGG')
     .map((h) => ({
@@ -216,10 +228,14 @@ export function RoomModal() {
   const atmosphereClass = getRoomAtmosphereGradient(zone.id)
 
   const handleOpenSystemModal = (hotspot: HotspotDTO) => {
+    const currentUser = getLmsUser()
+    if (!currentUser) {
+      redirectToLmsLogin(false)
+      return
+    }
     const surface = hotspot.category as LmsSurfaceCategory
-    const perm = checkLmsPermission(getLmsUser(), surface)
+    const perm = checkLmsPermission(currentUser, surface)
     if (!perm.allowed) {
-      redirectToLmsLogin(perm.reason === 'forbidden')
       return
     }
     setSystemModalHotspot(hotspot)

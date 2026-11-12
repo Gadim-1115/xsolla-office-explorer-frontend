@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { LogIn, LogOut, RotateCcw, UserCheck } from 'lucide-react'
+import { ArrowLeft, LogIn, LogOut, RotateCcw, UserCheck } from 'lucide-react'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
 import {
   captureLmsSessionFromUrl,
   clearLmsSession,
   getLmsRoleLabel,
   getLmsUser,
+  redirectToLmsApp,
   redirectToLmsLogin,
   type LmsUser,
 } from '../../../shared/api/lmsClient'
@@ -131,21 +132,32 @@ export function ProgressHeader() {
 
         <div className="order-2 ml-auto flex shrink-0 items-center gap-2 xl:order-3 xl:ml-0">
           {lmsUser ? (
-            <div className="flex items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#233134] px-2.5 py-1.5 text-xs text-white">
-              <UserCheck className="h-3.5 w-3.5 text-[#80EAFF]" />
-              <span className="hidden md:inline font-semibold">{lmsUser.name}</span>
-              <span className="rounded bg-[#153640] px-1.5 py-0.5 text-[10px] font-bold text-[#80EAFF]">
-                {getLmsRoleLabel(lmsUser)}
-              </span>
+            <>
               <button
                 type="button"
-                onClick={handleLmsSignOut}
-                title="Sign out of LMS session"
-                className="ml-1 rounded p-0.5 text-[#9DB0B4] hover:bg-[#2F4045] hover:text-white transition cursor-pointer"
+                onClick={() => redirectToLmsApp()}
+                title="Return to Xsolla School LMS"
+                className="flex shrink-0 items-center gap-1.5 rounded-[6px] border border-[#80EAFF]/40 bg-[#153640] px-2.5 py-2 text-xs font-semibold text-[#80EAFF] hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer sm:px-3"
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Back to LMS</span>
               </button>
-            </div>
+              <div className="flex items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#233134] px-2.5 py-1.5 text-xs text-white">
+                <UserCheck className="h-3.5 w-3.5 text-[#80EAFF]" />
+                <span className="hidden md:inline font-semibold">{lmsUser.name}</span>
+                <span className="rounded bg-[#153640] px-1.5 py-0.5 text-[10px] font-bold text-[#80EAFF]">
+                  {getLmsRoleLabel(lmsUser)}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLmsSignOut}
+                  title="Sign out of LMS session"
+                  className="ml-1 rounded p-0.5 text-[#9DB0B4] hover:bg-[#2F4045] hover:text-white transition cursor-pointer"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </>
           ) : (
             <button
               type="button"
