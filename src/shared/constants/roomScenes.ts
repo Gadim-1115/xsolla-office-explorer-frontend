@@ -59,12 +59,12 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
         {
           id: 'hs_os1_start_desk',
           zone_id: 'zone_lecturezone_open_space_1',
-          category: 'DESK',
+          category: 'GRADES',
           x_percent: 30.5,
           y_percent: 56.0,
-          title: 'Student Desk · LMS Tasks',
+          title: 'Student Desk · Student Grades',
           content:
-            'Student workstation in Xsolla School Open Space 1. Click to view active LMS assignments and sprint tasks.',
+            'Student workstation in Xsolla School Open Space 1. Click to inspect weekly standing grades (Green / Yellow / Red) and mentor feedback in LMS.',
           is_claimed: false,
         },
         {
@@ -180,12 +180,12 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
         {
           id: 'hs_os1_2_desk_right',
           zone_id: 'zone_lecturezone_open_space_1',
-          category: 'DESK',
+          category: 'GRADES',
           x_percent: 71.0,
           y_percent: 55.0,
-          title: 'Team Desk · LMS Tasks',
+          title: 'Team Desk · Student Grades',
           content:
-            'Click to open team project backlog and active LMS tasks.',
+            'Click to view weekly module grades, standing streaks, and task evaluations from LMS.',
           is_claimed: false,
         },
         {
@@ -655,12 +655,12 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
         {
           id: 'hs_os2_start_desk_right',
           zone_id: 'zone_open_space_2',
-          category: 'DESK',
+          category: 'GRADES',
           x_percent: 91.5,
           y_percent: 56.0,
-          title: 'Engineering Desk · LMS Tasks',
+          title: 'Mentor Desk · Student Grades',
           content:
-            'Click to view engineering tasks and code review assignments in LMS.',
+            'Click to view student weekly ratings and cohort standing records in LMS.',
           is_claimed: false,
         },
       ],
@@ -711,12 +711,12 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
         {
           id: 'hs_os2_2_desk',
           zone_id: 'zone_open_space_2',
-          category: 'DESK',
+          category: 'GRADES',
           x_percent: 54.0,
           y_percent: 60.0,
-          title: 'Workstation · LMS Tasks',
+          title: 'Workstation · Student Grades',
           content:
-            'Click to open active LMS Tasks and sprint deliverables for this team area.',
+            'Click to open weekly standing grades and mentor feedback for this workstation cluster.',
           is_claimed: false,
         },
       ],
@@ -959,7 +959,7 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
         {
           id: 'hs_m5_desk',
           zone_id: 'zone_meeting_5',
-          category: 'DESK',
+          category: 'WHITEBOARD',
           x_percent: 3.5,
           y_percent: 49.0,
           title: 'M5 Whiteboard · LMS Tasks',
@@ -1013,7 +1013,7 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
         {
           id: 'hs_m9_desk',
           zone_id: 'zone_meeting_9',
-          category: 'DESK',
+          category: 'WHITEBOARD',
           x_percent: 97.2,
           y_percent: 51.0,
           title: 'Boardroom Whiteboard · LMS Tasks',
@@ -1054,7 +1054,7 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
         {
           id: 'hs_m10_desk_1',
           zone_id: 'zone_meeting_10',
-          category: 'DESK',
+          category: 'WHITEBOARD',
           x_percent: 4.5,
           y_percent: 51.0,
           title: 'Whiteboard 1 · LMS Tasks',
@@ -1065,7 +1065,7 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
         {
           id: 'hs_m10_desk_2',
           zone_id: 'zone_meeting_10',
-          category: 'DESK',
+          category: 'WHITEBOARD',
           x_percent: 29.8,
           y_percent: 41.0,
           title: 'Whiteboard 2 · LMS Tasks',

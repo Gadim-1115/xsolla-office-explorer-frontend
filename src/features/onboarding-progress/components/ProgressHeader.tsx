@@ -1,11 +1,39 @@
-import { useEffect, useRef } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { LogIn, LogOut, RotateCcw, UserCheck } from 'lucide-react'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
+import {
+  captureLmsSessionFromUrl,
+  clearLmsSession,
+  getLmsRoleLabel,
+  getLmsUser,
+  redirectToLmsLogin,
+  type LmsUser,
+} from '../../../shared/api/lmsClient'
 import { XsollaLogo } from '../../../shared/ui/XsollaLogo'
 
 export function ProgressHeader() {
   const { progress, notify, refreshMap } = useExplorer()
   const headerRef = useRef<HTMLElement>(null)
+  const [lmsUser, setLmsUser] = useState<LmsUser | null>(() => {
+    captureLmsSessionFromUrl()
+    return getLmsUser()
+  })
+
+  useEffect(() => {
+    const syncUser = () => {
+      captureLmsSessionFromUrl()
+      setLmsUser(getLmsUser())
+    }
+    syncUser()
+    window.addEventListener('hashchange', syncUser)
+    window.addEventListener('popstate', syncUser)
+    window.addEventListener('focus', syncUser)
+    return () => {
+      window.removeEventListener('hashchange', syncUser)
+      window.removeEventListener('popstate', syncUser)
+      window.removeEventListener('focus', syncUser)
+    }
+  }, [])
 
   const completion = progress?.completion_percentage ?? 0
   const unlockedZones = progress?.unlocked_zones_count ?? 0
@@ -13,8 +41,6 @@ export function ProgressHeader() {
   const foundEggs = progress?.found_eggs_count ?? 0
   const totalEggs = progress?.total_easter_eggs ?? 5
 
-  // The header wraps to two rows below xl, so its height changes with the screen width.
-  // The map size and the room view's top edge read it from --explorer-header-h.
   useEffect(() => {
     const el = headerRef.current
     if (!el) return
@@ -35,6 +61,12 @@ export function ProgressHeader() {
     void refreshMap()
   }
 
+  const handleLmsSignOut = () => {
+    clearLmsSession()
+    setLmsUser(null)
+    notify('success', 'Signed Out of LMS', 'Opening LMS tasks, grades, or calendar now requires LMS sign-in.')
+  }
+
   const tileClass = 'min-w-0 rounded-[4px] border px-2.5 py-1.5 text-left sm:px-3.5 sm:py-2'
   const labelClass = 'truncate text-[10px] text-[#9DB0B4] sm:text-[11px]'
 
@@ -43,7 +75,6 @@ export function ProgressHeader() {
       ref={headerRef}
       className="w-full border-b border-[#2F4045] bg-[#141E20] px-4 py-2 sm:px-6 sm:py-2.5 z-30"
     >
-      {/* below xl: [logo + title | reset] on row 1, the stat tiles on row 2; xl+: one row */}
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-4 gap-y-2 xl:justify-between">
         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <XsollaLogo className="h-6 shrink-0 text-white sm:h-7" />
@@ -98,16 +129,46 @@ export function ProgressHeader() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleResetDemoUser}
-          title="Start fresh student session"
-          aria-label="Reset Session"
-          className="order-2 ml-auto flex shrink-0 items-center gap-1.5 rounded-[6px] border border-[#80EAFF]/30 bg-[#145B6D] px-2.5 py-2 text-xs font-semibold text-[#80EAFF] hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer sm:px-4 xl:order-3 xl:ml-0"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Reset Session</span>
-        </button>
+        <div className="order-2 ml-auto flex shrink-0 items-center gap-2 xl:order-3 xl:ml-0">
+          {lmsUser ? (
+            <div className="flex items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#233134] px-2.5 py-1.5 text-xs text-white">
+              <UserCheck className="h-3.5 w-3.5 text-[#80EAFF]" />
+              <span className="hidden md:inline font-semibold">{lmsUser.name}</span>
+              <span className="rounded bg-[#153640] px-1.5 py-0.5 text-[10px] font-bold text-[#80EAFF]">
+                {getLmsRoleLabel(lmsUser)}
+              </span>
+              <button
+                type="button"
+                onClick={handleLmsSignOut}
+                title="Sign out of LMS session"
+                className="ml-1 rounded p-0.5 text-[#9DB0B4] hover:bg-[#2F4045] hover:text-white transition cursor-pointer"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => redirectToLmsLogin()}
+              title="Sign in with Xsolla School LMS"
+              className="flex shrink-0 items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#233134] px-2.5 py-2 text-xs font-semibold text-white hover:border-[#80EAFF] hover:text-[#80EAFF] transition cursor-pointer sm:px-3"
+            >
+              <LogIn className="h-3.5 w-3.5 text-[#80EAFF]" />
+              <span className="hidden sm:inline">LMS Sign In</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleResetDemoUser}
+            title="Start fresh student session"
+            aria-label="Reset Session"
+            className="flex shrink-0 items-center gap-1.5 rounded-[6px] border border-[#80EAFF]/30 bg-[#145B6D] px-2.5 py-2 text-xs font-semibold text-[#80EAFF] hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer sm:px-3.5"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Reset Session</span>
+          </button>
+        </div>
       </div>
     </header>
   )

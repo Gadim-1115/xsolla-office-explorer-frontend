@@ -20,13 +20,19 @@ import { Modal } from '../../../shared/ui/Modal'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
 import type { HotspotDTO } from '../../../shared/types/api.types'
 import {
-  EXTERNAL_INTEGRATION_URLS,
   resolveRoomScenes,
   type StreetViewLink,
 } from '../../../shared/constants/roomScenes'
+import {
+  checkLmsPermission,
+  getLmsUser,
+  redirectToLmsLogin,
+  type LmsSurfaceCategory,
+} from '../../../shared/api/lmsClient'
 import { EquipmentHotspot } from './EquipmentHotspot'
 import { EasterEggTrigger } from './EasterEggTrigger'
 import { StreetViewArrow } from './StreetViewArrow'
+import { LmsSurfaceModal } from './LmsSurfaceModal'
 import { useEasterEgg } from '../hooks/useEasterEgg'
 
 function getRoomAtmosphereGradient(zoneId: string): string {
@@ -210,9 +216,10 @@ export function RoomModal() {
   const atmosphereClass = getRoomAtmosphereGradient(zone.id)
 
   const handleOpenSystemModal = (hotspot: HotspotDTO) => {
-    // MONITOR boards always show the pop-up first: it explains which calendar opens and why
-    if (hotspot.category === 'DESK' && EXTERNAL_INTEGRATION_URLS.LMS_TASKS_URL) {
-      window.open(EXTERNAL_INTEGRATION_URLS.LMS_TASKS_URL, '_blank')
+    const surface = hotspot.category as LmsSurfaceCategory
+    const perm = checkLmsPermission(getLmsUser(), surface)
+    if (!perm.allowed) {
+      redirectToLmsLogin(perm.reason === 'forbidden')
       return
     }
     setSystemModalHotspot(hotspot)
@@ -700,81 +707,10 @@ export function RoomModal() {
         </div>
       </div>
 
-      <Modal
-        isOpen={Boolean(systemModalHotspot)}
+      <LmsSurfaceModal
+        hotspot={systemModalHotspot}
         onClose={() => setSystemModalHotspot(null)}
-        title={
-          systemModalHotspot?.category === 'MONITOR'
-            ? `Weekly Schedule · ${systemModalHotspot.title}`
-            : `LMS Tasks · ${systemModalHotspot?.title || ''}`
-        }
-        subtitle={
-          systemModalHotspot?.category === 'MONITOR'
-            ? 'LMS lectures and events, in your Google Calendar'
-            : 'External Xsolla School LMS Tasks Integration Placeholder'
-        }
-        maxWidthClass="max-w-xl"
-      >
-        {systemModalHotspot && (
-          <div className="flex flex-col gap-4 text-left">
-            <div className="relative rounded-[6px] border border-[#80EAFF]/40 bg-[#153640] p-4 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#80EAFF]" />
-              <p className="text-xs font-bold uppercase tracking-wider text-[#80EAFF] mb-1">
-                {systemModalHotspot.category === 'MONITOR'
-                  ? 'Monitor / Projector Schedule Feed'
-                  : 'Workstation LMS Task Feed'}
-              </p>
-              <p className="text-sm text-white leading-relaxed font-medium">
-                {systemModalHotspot.content}
-              </p>
-            </div>
-
-            {systemModalHotspot.category === 'MONITOR' ? (
-              <div className="rounded-[6px] border border-[#2F4045] bg-[#1B2628] p-4 text-sm text-white flex flex-col gap-3">
-                <p className="text-[#9DB0B4] text-xs leading-relaxed">
-                  When a lecturer adds a lecture or event in the LMS and shares it to Google Calendar,
-                  every student in that module gets an invitation. Open your calendar to see this week.
-                  Use the Google account your LMS account is registered with.
-                </p>
-                <a
-                  href={EXTERNAL_INTEGRATION_URLS.WEEKLY_SCHEDULE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-[6px] bg-[#80EAFF] px-4 py-2.5 text-sm font-bold text-[#0D1A1D] hover:bg-[#A6F1FF] transition"
-                >
-                  Open my Google Calendar
-                </a>
-              </div>
-            ) : (
-              <div className="rounded-[6px] border border-[#2F4045] bg-[#1B2628] p-4 text-xs text-white space-y-2">
-                <div className="flex items-center justify-between border-b border-[#2F4045] pb-2 font-bold text-white">
-                  <span>LMS Task</span>
-                  <span>Status</span>
-                </div>
-                <div className="flex items-center justify-between py-1">
-                  <span className="font-medium">Implement 360° Street View Navigation Graph</span>
-                  <span className="rounded bg-[#153640] border border-[#80EAFF]/40 px-2 py-0.5 text-[10px] font-bold text-[#80EAFF]">
-                    IN PROGRESS
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1">
-                  <span className="font-medium">Connect Weekly Schedule & LMS API Endpoints</span>
-                  <span className="rounded bg-[#2F4045] px-2 py-0.5 text-[10px] font-bold text-white">
-                    TO DO
-                  </span>
-                </div>
-                <p className="pt-2 text-[11px] text-[#9DB0B4]">
-                  Connect live LMS API or set{' '}
-                  <code className="text-[#80EAFF] font-semibold">
-                    EXTERNAL_INTEGRATION_URLS.LMS_TASKS_URL
-                  </code>{' '}
-                  in <code className="text-[#80EAFF] font-semibold">roomScenes.ts</code>.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+      />
     </div>
   )
 }

@@ -11,6 +11,8 @@ export type HotspotCategory =
   | 'EASTER_EGG'
   | 'MONITOR'
   | 'DESK'
+  | 'WHITEBOARD'
+  | 'GRADES'
   | 'MEDKIT'
   | 'ELEVATOR'
   | 'BAR'

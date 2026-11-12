@@ -14,6 +14,8 @@ import {
   ExternalLink,
   Package,
   Gamepad2,
+  Presentation,
+  Award,
 } from 'lucide-react'
 import type { HotspotDTO } from '../../../shared/types/api.types'
 
@@ -35,7 +37,10 @@ export function EquipmentHotspot({
   const [isHovered, setIsHovered] = useState<boolean>(false)
   const showPopup = isHovered || isActive
   const isExternalSystem =
-    hotspot.category === 'MONITOR' || hotspot.category === 'DESK'
+    hotspot.category === 'MONITOR' ||
+    hotspot.category === 'DESK' ||
+    hotspot.category === 'WHITEBOARD' ||
+    hotspot.category === 'GRADES'
 
   const renderIcon = () => {
     switch (hotspot.category) {
@@ -48,6 +53,10 @@ export function EquipmentHotspot({
       case 'PROJECTOR':
       case 'MONITOR':
         return <Monitor className="h-4 w-4 text-[#80EAFF]" />
+      case 'WHITEBOARD':
+        return <Presentation className="h-4 w-4 text-[#80EAFF]" />
+      case 'GRADES':
+        return <Award className="h-4 w-4 text-[#80EAFF]" />
       case 'DESK':
         return <ClipboardList className="h-4 w-4 text-white" />
       case 'MEDKIT':
@@ -137,9 +146,13 @@ export function EquipmentHotspot({
             <span className="rounded-[4px] bg-[#153640] border border-[#80EAFF]/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#80EAFF]">
               {hotspot.category === 'MONITOR'
                 ? 'WEEKLY SCHEDULE'
-                : hotspot.category === 'DESK'
-                  ? 'LMS TASKS'
-                  : hotspot.category.replace('_', ' ')}
+                : hotspot.category === 'WHITEBOARD'
+                  ? 'WHITEBOARD TASKS'
+                  : hotspot.category === 'GRADES'
+                    ? 'STUDENT GRADES'
+                    : hotspot.category === 'DESK'
+                      ? 'LMS TASKS'
+                      : hotspot.category.replace('_', ' ')}
             </span>
           </div>
           <p className="text-xs text-[#9DB0B4] whitespace-pre-line leading-relaxed">
@@ -147,7 +160,13 @@ export function EquipmentHotspot({
           </p>
           {isExternalSystem && (
             <p className="mt-2.5 inline-block rounded-[4px] bg-[#80EAFF] px-2.5 py-1 text-[11px] font-bold text-[#0D1A1D]">
-              Click to open {hotspot.category === 'MONITOR' ? 'Weekly Schedule' : 'LMS Tasks'} →
+              Click to open{' '}
+              {hotspot.category === 'MONITOR'
+                ? 'Weekly Schedule'
+                : hotspot.category === 'GRADES'
+                  ? 'Student Grades'
+                  : 'LMS Tasks'}{' '}
+              →
             </p>
           )}
         </div>
