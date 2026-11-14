@@ -19,6 +19,8 @@ export type HotspotCategory =
   | 'CABINE'
   | 'STOCK'
   | 'GAME_TABLE'
+  | 'DAILY_BUG'
+  | 'LEADERBOARD'
 
 export interface APIError {
   code: string

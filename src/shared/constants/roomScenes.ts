@@ -779,6 +779,17 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
           is_claimed: false,
         },
         {
+          id: 'hs_os2_3_daily_bug',
+          zone_id: 'zone_open_space_2',
+          category: 'DAILY_BUG',
+          x_percent: 54.3,
+          y_percent: 56.1,
+          title: 'Daily Bug Hunt',
+          content:
+            'Click to zoom into this workstation monitor, inspect today’s buggy algorithm, and keep your daily streak lit.',
+          is_claimed: false,
+        },
+        {
           id: 'hotspot_egg_viewpoint',
           zone_id: 'zone_open_space_2',
           category: 'EASTER_EGG',
@@ -1114,6 +1125,17 @@ export const ROOM_SCENES_REGISTRY: Record<string, RoomSceneConfig[]> = {
           title: 'Table Games · Board Games',
           content:
             'Board games collection including Monopoly, Tabu, Jenga, and strategy card games for team breaks.',
+          is_claimed: false,
+        },
+        {
+          id: 'hs_gr1_trophies_leaderboard',
+          zone_id: 'zone_gameroom_1',
+          category: 'LEADERBOARD',
+          x_percent: 96.2,
+          y_percent: 19.5,
+          title: 'Streak Leaderboard',
+          content:
+            'Click the trophies to view the Top 10 Daily Bug Hunt Streak Leaderboard.',
           is_claimed: false,
         },
       ],

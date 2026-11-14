@@ -1178,3 +1178,141 @@ export async function fetchLmsCalendar(): Promise<LmsCalendarEvent[]> {
 
   return [...baseEvents, ...deadlineItems].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
 }
+
+export interface LmsOpenQuizReminder {
+  id: string
+  moduleId: string
+  modulePosition: number
+  moduleTitle: string
+  title: string
+  questionCount: number
+  dueAt?: string | null
+}
+
+export interface LmsStudentRemindersData {
+  isLiveConnected: boolean
+  pendingTasks: LmsTaskItem[]
+  openQuizzes: LmsOpenQuizReminder[]
+  upcomingEvents: LmsCalendarEvent[]
+  summaryText: string
+}
+
+export async function fetchLiveStudentReminders(): Promise<LmsStudentRemindersData | null> {
+  const user = getLmsUser()
+  if (!user || !isLmsStudent(user)) {
+    return null
+  }
+
+  if (!isLiveLmsBackend()) {
+    return {
+      isLiveConnected: false,
+      pendingTasks: [],
+      openQuizzes: [],
+      upcomingEvents: [],
+      summaryText: 'Connect to the live LMS server to view your real-time assignments and quizzes.',
+    }
+  }
+
+  const now = new Date()
+  const rawModules = (await lmsAuthedRequest<RawApiModule[] | null>('/modules')) ?? []
+  const sortedModules = sortApiModules(rawModules)
+  const openModules = sortedModules.filter((m) => !m.opens_at || new Date(m.opens_at) <= now)
+
+  const [liveTasks, quizzesPerModule, rawEvents] = await Promise.all([
+    fetchLiveTasksInternal(user, now).catch(() => [] as LmsTaskItem[]),
+    Promise.all(
+      openModules.map(async (m) => {
+        interface RawQuizItem {
+          id: number | string
+          module_id: number | string
+          title: string
+          due_at?: string | null
+          status?: string
+          questions?: unknown[] | null
+          attempt?: { id: number | string } | null
+        }
+        try {
+          const list =
+            (await lmsAuthedRequest<RawQuizItem[] | null>(`/modules/${m.id}/quizzes`)) ?? []
+          return list
+            .filter((q) => (!q.status || q.status === 'ready') && !q.attempt)
+            .map((q) => ({
+              id: String(q.id),
+              moduleId: String(m.id),
+              modulePosition: m.position,
+              moduleTitle: m.title,
+              title: q.title,
+              questionCount: Array.isArray(q.questions) ? q.questions.length : 0,
+              dueAt: q.due_at ?? m.closes_at ?? null,
+            }))
+        } catch {
+          return [] as LmsOpenQuizReminder[]
+        }
+      }),
+    ),
+    lmsAuthedRequest<
+      | {
+          id: number | string
+          title: string
+          kind?: string | null
+          type?: string | null
+          starts_at: string
+          ends_at: string
+          all_day?: boolean
+          location?: string | null
+        }[]
+      | null
+    >('/events').catch(() => null),
+  ])
+
+  const pendingTasks = liveTasks.filter((t) => t.status === 'open' || t.status === 'overdue')
+  const openQuizzes = quizzesPerModule.flat()
+
+  const sevenDaysAhead = new Date(now.getTime() + 7 * 86_400_000)
+  const upcomingEvents: LmsCalendarEvent[] = (rawEvents ?? [])
+    .filter((e) => {
+      const start = new Date(e.starts_at)
+      return start >= now && start <= sevenDaysAhead
+    })
+    .map((e) => {
+      const rawKind = (e.kind ?? e.type ?? '').toLowerCase()
+      const kind: LmsEventKind =
+        rawKind === 'lecture' || rawKind === 'meeting' || rawKind === 'off-campus'
+          ? rawKind
+          : 'meeting'
+      return {
+        id: String(e.id),
+        title: e.title,
+        kind,
+        startsAt: e.starts_at,
+        endsAt: e.ends_at,
+        allDay: Boolean(e.all_day),
+        location: e.location || undefined,
+      }
+    })
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+
+  const parts: string[] = []
+  if (pendingTasks.length > 0) {
+    parts.push(`${pendingTasks.length} pending ${pendingTasks.length === 1 ? 'assignment' : 'assignments'}`)
+  }
+  if (openQuizzes.length > 0) {
+    parts.push(`${openQuizzes.length} open ${openQuizzes.length === 1 ? 'quiz' : 'quizzes'}`)
+  }
+  if (upcomingEvents.length > 0) {
+    parts.push(`${upcomingEvents.length} upcoming ${upcomingEvents.length === 1 ? 'session' : 'sessions'} this week`)
+  }
+
+  const summaryText =
+    parts.length > 0
+      ? `You currently have ${parts.join(', ')} in LMS.`
+      : 'All caught up! You have no pending assignments or untaken quizzes right now.'
+
+  return {
+    isLiveConnected: true,
+    pendingTasks,
+    openQuizzes,
+    upcomingEvents,
+    summaryText,
+  }
+}

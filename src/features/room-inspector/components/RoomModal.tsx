@@ -33,6 +33,8 @@ import { EquipmentHotspot } from './EquipmentHotspot'
 import { EasterEggTrigger } from './EasterEggTrigger'
 import { StreetViewArrow } from './StreetViewArrow'
 import { LmsSurfaceModal } from './LmsSurfaceModal'
+import { DailyBugMonitorModal } from '../../daily-bug-hunt/components/DailyBugMonitorModal'
+import { StreakLeaderboardModal } from '../../daily-bug-hunt/components/StreakLeaderboardModal'
 import { useEasterEgg } from '../hooks/useEasterEgg'
 
 function getRoomAtmosphereGradient(zoneId: string): string {
@@ -68,6 +70,9 @@ export function RoomModal() {
   const [activeSceneIndex, setActiveSceneIndex] = useState<number>(0)
   const [selectedHotspot, setSelectedHotspot] = useState<HotspotDTO | null>(null)
   const [systemModalHotspot, setSystemModalHotspot] = useState<HotspotDTO | null>(null)
+  const [isDailyBugOpen, setIsDailyBugOpen] = useState<boolean>(false)
+  const [isZoomingMonitor, setIsZoomingMonitor] = useState<boolean>(false)
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState<boolean>(false)
   const [failedUrls, setFailedUrls] = useState<Record<string, boolean>>({})
   const [isWalking, setIsWalking] = useState<boolean>(false)
 
@@ -228,6 +233,17 @@ export function RoomModal() {
   const atmosphereClass = getRoomAtmosphereGradient(zone.id)
 
   const handleOpenSystemModal = (hotspot: HotspotDTO) => {
+    if (hotspot.category === 'DAILY_BUG') {
+      setIsZoomingMonitor(true)
+      window.setTimeout(() => {
+        setIsDailyBugOpen(true)
+      }, 360)
+      return
+    }
+    if (hotspot.category === 'LEADERBOARD') {
+      setIsLeaderboardOpen(true)
+      return
+    }
     const currentUser = getLmsUser()
     if (!currentUser) {
       redirectToLmsLogin(false)
@@ -515,12 +531,20 @@ export function RoomModal() {
           is360Mode ? (
             <div
               style={{
-                transform: `scale(${isWalking ? fovZoom * 1.38 : fovZoom}) translateY(${pitchDeg * 3.2}px)`,
+                transform: `scale(${
+                  isZoomingMonitor
+                    ? fovZoom * 1.95
+                    : isWalking
+                      ? fovZoom * 1.38
+                      : fovZoom
+                }) translateY(${pitchDeg * 3.2}px)`,
               }}
               className={`relative -top-[8%] h-[116%] w-full ${
-                isWalking
-                  ? 'transition-all duration-300 ease-in opacity-45 blur-[2px]'
-                  : 'transition-opacity duration-200'
+                isZoomingMonitor
+                  ? 'transition-all duration-500 ease-out brightness-75 blur-[1.5px]'
+                  : isWalking
+                    ? 'transition-all duration-300 ease-in opacity-45 blur-[2px]'
+                    : 'transition-all duration-300'
               }`}
             >
               <div
@@ -726,6 +750,20 @@ export function RoomModal() {
       <LmsSurfaceModal
         hotspot={systemModalHotspot}
         onClose={() => setSystemModalHotspot(null)}
+      />
+
+      <DailyBugMonitorModal
+        isOpen={isDailyBugOpen}
+        onClose={() => {
+          setIsDailyBugOpen(false)
+          setIsZoomingMonitor(false)
+        }}
+        onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
+      />
+
+      <StreakLeaderboardModal
+        isOpen={isLeaderboardOpen}
+        onClose={() => setIsLeaderboardOpen(false)}
       />
     </div>
   )

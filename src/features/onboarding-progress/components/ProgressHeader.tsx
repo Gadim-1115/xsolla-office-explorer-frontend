@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, LogIn, LogOut, RotateCcw, UserCheck } from 'lucide-react'
+import { ArrowLeft, Flame, LogIn, LogOut, RotateCcw, UserCheck } from 'lucide-react'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
 import {
   captureLmsSessionFromUrl,
@@ -10,29 +10,48 @@ import {
   redirectToLmsLogin,
   type LmsUser,
 } from '../../../shared/api/lmsClient'
+import {
+  getUserStreakStatus,
+  STREAK_UPDATED_EVENT,
+  syncUserStreakFromBackend,
+  type UserStreakStatus,
+} from '../../daily-bug-hunt/api/streakService'
+import { StudentReminderButton } from './StudentReminderButton'
 import { XsollaLogo } from '../../../shared/ui/XsollaLogo'
 
 export function ProgressHeader() {
-  const { progress, notify, refreshMap } = useExplorer()
+  const { zones, progress, notify, refreshMap, openRoomModal, openQuestModal } = useExplorer()
   const headerRef = useRef<HTMLElement>(null)
   const [lmsUser, setLmsUser] = useState<LmsUser | null>(() => {
     captureLmsSessionFromUrl()
     return getLmsUser()
   })
+  const [streakStatus, setStreakStatus] = useState<UserStreakStatus | null>(() =>
+    getUserStreakStatus(getLmsUser()),
+  )
 
   useEffect(() => {
     const syncUser = () => {
       captureLmsSessionFromUrl()
-      setLmsUser(getLmsUser())
+      const current = getLmsUser()
+      setLmsUser(current)
+      setStreakStatus(getUserStreakStatus(current))
+      if (current) {
+        void syncUserStreakFromBackend(current).then((synced) => {
+          setStreakStatus(synced)
+        })
+      }
     }
     syncUser()
     window.addEventListener('hashchange', syncUser)
     window.addEventListener('popstate', syncUser)
     window.addEventListener('focus', syncUser)
+    window.addEventListener(STREAK_UPDATED_EVENT, syncUser)
     return () => {
       window.removeEventListener('hashchange', syncUser)
       window.removeEventListener('popstate', syncUser)
       window.removeEventListener('focus', syncUser)
+      window.removeEventListener(STREAK_UPDATED_EVENT, syncUser)
     }
   }, [])
 
@@ -65,7 +84,17 @@ export function ProgressHeader() {
   const handleLmsSignOut = () => {
     clearLmsSession()
     setLmsUser(null)
+    setStreakStatus(null)
     notify('success', 'Signed Out of LMS', 'Opening LMS tasks, grades, or calendar now requires LMS sign-in.')
+  }
+
+  const handleStreakClick = () => {
+    const os2 = zones['zone_open_space_2']
+    if (os2 && os2.status === 'LOCKED') {
+      openQuestModal('zone_open_space_2')
+      return
+    }
+    openRoomModal('zone_open_space_2', 'zone_open_space_2_3')
   }
 
   const tileClass = 'min-w-0 rounded-[4px] border px-2.5 py-1.5 text-left sm:px-3.5 sm:py-2'
@@ -133,6 +162,32 @@ export function ProgressHeader() {
         <div className="order-2 ml-auto flex shrink-0 items-center gap-2 xl:order-3 xl:ml-0">
           {lmsUser ? (
             <>
+              <StudentReminderButton user={lmsUser} />
+
+              <button
+                type="button"
+                onClick={handleStreakClick}
+                title={
+                  streakStatus?.solvedToday
+                    ? `${streakStatus.streak} Day Streak Active Today! Click to visit Daily Bug Hunt monitor.`
+                    : `Daily Streak Unlit (${streakStatus?.streak ?? 0} days). Click to solve today’s bug in Open Space 2!`
+                }
+                className={`flex h-9 shrink-0 items-center gap-1.5 rounded-[6px] border px-2.5 text-xs font-bold transition cursor-pointer ${
+                  streakStatus?.solvedToday
+                    ? 'border-amber-400/70 bg-amber-500/20 text-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.22)] hover:bg-amber-500/30'
+                    : 'border-[#2F4045] bg-[#1D2A2D] text-[#7D9196] hover:border-[#80EAFF]/50 hover:text-white'
+                }`}
+              >
+                <Flame
+                  className={`h-4 w-4 transition-all ${
+                    streakStatus?.solvedToday
+                      ? 'fill-amber-400 text-orange-400 drop-shadow-[0_0_5px_rgba(251,146,60,0.85)]'
+                      : 'text-[#5A6E73] opacity-55'
+                  }`}
+                />
+                <span>{streakStatus?.streak ?? 0}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => redirectToLmsApp()}

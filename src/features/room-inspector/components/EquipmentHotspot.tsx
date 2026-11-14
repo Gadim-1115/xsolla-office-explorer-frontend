@@ -16,6 +16,8 @@ import {
   Gamepad2,
   Presentation,
   Award,
+  Bug,
+  Trophy,
 } from 'lucide-react'
 import type { HotspotDTO } from '../../../shared/types/api.types'
 
@@ -40,7 +42,9 @@ export function EquipmentHotspot({
     hotspot.category === 'MONITOR' ||
     hotspot.category === 'DESK' ||
     hotspot.category === 'WHITEBOARD' ||
-    hotspot.category === 'GRADES'
+    hotspot.category === 'GRADES' ||
+    hotspot.category === 'DAILY_BUG' ||
+    hotspot.category === 'LEADERBOARD'
 
   const renderIcon = () => {
     switch (hotspot.category) {
@@ -57,6 +61,10 @@ export function EquipmentHotspot({
         return <Presentation className="h-4 w-4 text-[#80EAFF]" />
       case 'GRADES':
         return <Award className="h-4 w-4 text-[#80EAFF]" />
+      case 'DAILY_BUG':
+        return <Bug className="h-4 w-4 text-amber-300" />
+      case 'LEADERBOARD':
+        return <Trophy className="h-4 w-4 text-amber-300" />
       case 'DESK':
         return <ClipboardList className="h-4 w-4 text-white" />
       case 'MEDKIT':
@@ -152,7 +160,11 @@ export function EquipmentHotspot({
                     ? 'STUDENT GRADES'
                     : hotspot.category === 'DESK'
                       ? 'LMS TASKS'
-                      : hotspot.category.replace('_', ' ')}
+                      : hotspot.category === 'DAILY_BUG'
+                        ? 'DAILY CHALLENGE'
+                        : hotspot.category === 'LEADERBOARD'
+                          ? 'TOP 10 STREAK'
+                          : hotspot.category.replace('_', ' ')}
             </span>
           </div>
           <p className="text-xs text-[#9DB0B4] whitespace-pre-line leading-relaxed">
@@ -165,7 +177,11 @@ export function EquipmentHotspot({
                 ? 'Weekly Schedule'
                 : hotspot.category === 'GRADES'
                   ? 'Student Grades'
-                  : 'LMS Tasks'}{' '}
+                  : hotspot.category === 'DAILY_BUG'
+                    ? 'Workstation Monitor'
+                    : hotspot.category === 'LEADERBOARD'
+                      ? 'Top 10 Leaderboard'
+                      : 'LMS Tasks'}{' '}
               →
             </p>
           )}
