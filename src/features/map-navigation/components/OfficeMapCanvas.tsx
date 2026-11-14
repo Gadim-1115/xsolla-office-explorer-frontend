@@ -5,6 +5,7 @@ import { useExplorer } from '../../../app/providers/ExplorerProvider'
 import { useMapInteraction } from '../hooks/useMapInteraction'
 import { CrescentFloorSvg } from './CrescentFloorSvg'
 import { MapHotspotPin } from './MapHotspotPin'
+import { TechFactBanner } from './TechFactBanner'
 import {
   ELEVATOR_ENTRANCES,
   MAP_ZONE_IDS,
@@ -197,6 +198,8 @@ export function OfficeMapCanvas() {
                 <Maximize2 className="h-4 w-4" />
               </button>
             </div>
+
+            <TechFactBanner />
 
             <TransformComponent
               wrapperStyle={{ width: '100%', height: '100%' }}
