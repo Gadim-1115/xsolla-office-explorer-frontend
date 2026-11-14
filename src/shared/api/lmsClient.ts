@@ -6,6 +6,7 @@ export interface LmsUser {
   email: string
   roles: LmsRole[]
   roleUntil?: Partial<Record<LmsRole, string>>
+  avatarUrl?: string | null
 }
 
 export interface LmsTokens {
@@ -113,7 +114,7 @@ function normalizeRoles(raw: unknown): LmsRole[] {
 
 function normalizeUser(raw: unknown): LmsUser | null {
   if (!raw || typeof raw !== 'object') return null
-  const u = raw as Partial<LmsUser> & { role?: unknown }
+  const u = raw as Partial<LmsUser> & { role?: unknown; avatar_url?: unknown }
   if (typeof u.id !== 'number' && typeof u.id !== 'string') return null
   const roleUntil: Partial<Record<LmsRole, string>> = {}
   if (u.roleUntil && typeof u.roleUntil === 'object') {
@@ -123,12 +124,19 @@ function normalizeUser(raw: unknown): LmsUser | null {
       }
     }
   }
+  const rawAvatar =
+    typeof u.avatarUrl === 'string'
+      ? u.avatarUrl.trim()
+      : typeof u.avatar_url === 'string'
+        ? u.avatar_url.trim()
+        : ''
   return {
     id: Number(u.id),
     name: String(u.name ?? ''),
     email: String(u.email ?? ''),
     roles: normalizeRoles(u.roles ?? u.role),
     ...(Object.keys(roleUntil).length > 0 ? { roleUntil } : {}),
+    avatarUrl: rawAvatar || null,
   }
 }
 
@@ -1315,4 +1323,110 @@ export async function fetchLiveStudentReminders(): Promise<LmsStudentRemindersDa
     upcomingEvents,
     summaryText,
   }
+}
+
+export function resolveLmsAvatarUrl(rawUrl?: string | null): string | null {
+  if (!rawUrl || typeof rawUrl !== 'string') return null
+  const trimmed = rawUrl.trim()
+  if (!trimmed) return null
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed
+  }
+  const apiBase = getLmsApiUrl()
+  if (apiBase) {
+    try {
+      const apiOrigin = new URL(apiBase).origin
+      return `${apiOrigin}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`
+    } catch {
+      return `${apiBase.replace(/\/api\/v1$/, '')}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`
+    }
+  }
+  const lmsOrigin = getLmsOrigin()
+  return `${lmsOrigin}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`
+}
+
+export async function fetchLmsMyProfileAvatar(): Promise<string | null> {
+  const user = getLmsUser()
+  if (!user) return null
+  if (!isLiveLmsBackend()) {
+    return resolveLmsAvatarUrl(user.avatarUrl)
+  }
+
+  let foundAvatar: string | null = user.avatarUrl ?? null
+  try {
+    const profile = await lmsAuthedRequest<{ avatar_url?: string | null }>('/users/me/profile')
+    if (profile && typeof profile.avatar_url === 'string' && profile.avatar_url.trim()) {
+      foundAvatar = profile.avatar_url.trim()
+    }
+  } catch {
+    try {
+      const me = await lmsAuthedRequest<{ avatar_url?: string | null }>('/users/me')
+      if (me && typeof me.avatar_url === 'string' && me.avatar_url.trim()) {
+        foundAvatar = me.avatar_url.trim()
+      }
+    } catch {
+      foundAvatar = user.avatarUrl ?? null
+    }
+  }
+
+  const resolved = resolveLmsAvatarUrl(foundAvatar)
+  if (resolved && resolved !== user.avatarUrl) {
+    try {
+      const updatedUser: LmsUser = { ...user, avatarUrl: resolved }
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser))
+    } catch (err) {
+      void err
+    }
+  }
+  return resolved
+}
+
+export async function fetchLmsDirectoryAvatars(): Promise<Record<string, string>> {
+  const map: Record<string, string> = {}
+  const user = getLmsUser()
+  if (user?.avatarUrl) {
+    const resolved = resolveLmsAvatarUrl(user.avatarUrl)
+    if (resolved) {
+      map[`lms-${user.id}`] = resolved
+      map[user.name.trim().toLowerCase()] = resolved
+    }
+  }
+  if (!user || !isLiveLmsBackend()) {
+    return map
+  }
+
+  try {
+    const myAvatar = await fetchLmsMyProfileAvatar()
+    if (myAvatar) {
+      map[`lms-${user.id}`] = myAvatar
+      map[user.name.trim().toLowerCase()] = myAvatar
+    }
+  } catch (err) {
+    void err
+  }
+
+  try {
+    const users =
+      (await lmsAuthedRequest<
+        { id: number | string; name?: string; avatar_url?: string | null }[] | null
+      >('/users')) ?? []
+    for (const u of users) {
+      const resolved = resolveLmsAvatarUrl(u.avatar_url)
+      if (resolved) {
+        map[`lms-${u.id}`] = resolved
+        if (u.name) {
+          map[u.name.trim().toLowerCase()] = resolved
+        }
+      }
+    }
+  } catch (err) {
+    void err
+  }
+
+  return map
 }

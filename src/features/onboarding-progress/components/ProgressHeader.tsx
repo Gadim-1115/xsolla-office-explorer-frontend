@@ -198,7 +198,15 @@ export function ProgressHeader() {
                 <span>Back to LMS</span>
               </button>
               <div className="flex items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#233134] px-2.5 py-1.5 text-xs text-white">
-                <UserCheck className="h-3.5 w-3.5 text-[#80EAFF]" />
+                {streakStatus?.avatarUrl || lmsUser.avatarUrl ? (
+                  <img
+                    src={streakStatus?.avatarUrl || lmsUser.avatarUrl || ''}
+                    alt={lmsUser.name}
+                    className="h-5 w-5 rounded-full object-cover border border-[#80EAFF]/50"
+                  />
+                ) : (
+                  <UserCheck className="h-3.5 w-3.5 text-[#80EAFF]" />
+                )}
                 <span className="hidden md:inline font-semibold">{lmsUser.name}</span>
                 <span className="rounded bg-[#153640] px-1.5 py-0.5 text-[10px] font-bold text-[#80EAFF]">
                   {getLmsRoleLabel(lmsUser)}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Coffee,
   Refrigerator,
@@ -37,6 +37,37 @@ export function EquipmentHotspot({
   compact = false,
 }: EquipmentHotspotProps) {
   const [isHovered, setIsHovered] = useState<boolean>(false)
+  const leaveTimerRef = useRef<number | null>(null)
+
+  const clearLeaveTimer = () => {
+    if (leaveTimerRef.current !== null) {
+      window.clearTimeout(leaveTimerRef.current)
+      leaveTimerRef.current = null
+    }
+  }
+
+  const handleMouseEnter = () => {
+    clearLeaveTimer()
+    setIsHovered(true)
+    onSelect(hotspot)
+  }
+
+  const handleMouseLeave = () => {
+    clearLeaveTimer()
+    leaveTimerRef.current = window.setTimeout(() => {
+      setIsHovered(false)
+      onSelect(null)
+    }, 140)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (leaveTimerRef.current !== null) {
+        window.clearTimeout(leaveTimerRef.current)
+      }
+    }
+  }, [])
+
   const showPopup = isHovered || isActive
   const isExternalSystem =
     hotspot.category === 'MONITOR' ||
@@ -104,22 +135,25 @@ export function EquipmentHotspot({
 
   const openBelow = hotspot.y_percent < 36
 
+  const getActionLabel = () => {
+    if (hotspot.category === 'MONITOR') return 'Weekly Schedule'
+    if (hotspot.category === 'GRADES') return 'Student Grades'
+    if (hotspot.category === 'DAILY_BUG') return 'Workstation Monitor'
+    if (hotspot.category === 'LEADERBOARD') return 'Top 10 Leaderboard'
+    return 'LMS Tasks'
+  }
+
   return (
     <div
       style={{
         left: `${hotspot.x_percent}%`,
         top: `${hotspot.y_percent}%`,
       }}
-      onMouseEnter={() => {
-        setIsHovered(true)
-        onSelect(hotspot)
-      }}
-      onMouseLeave={() => {
-        setIsHovered(false)
-        onSelect(null)
-      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onMouseDown={(e) => e.stopPropagation()}
-      className="absolute -translate-x-1/2 -translate-y-1/2 z-30"
+      onPointerDown={(e) => e.stopPropagation()}
+      className={`absolute -translate-x-1/2 -translate-y-1/2 ${showPopup ? 'z-40' : 'z-30'}`}
     >
       <div
         onClick={(e) => {
@@ -141,50 +175,52 @@ export function EquipmentHotspot({
 
       {showPopup && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 w-72 sm:w-80 rounded-xl border border-[#2F4045] bg-[#233134] p-4 text-left shadow-[0_18px_48px_rgba(0,0,0,0.24)] overflow-hidden transition-all duration-150 pointer-events-none ${
-            openBelow ? 'top-full mt-3' : 'bottom-full mb-3'
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute left-1/2 -translate-x-1/2 w-72 sm:w-80 pointer-events-auto ${
+            openBelow ? 'top-full pt-2.5' : 'bottom-full pb-2.5'
           }`}
         >
-          <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#80EAFF]" />
-          <div className="flex items-center justify-between gap-2 border-b border-[#2F4045] pb-2 mb-2">
-            <span className="flex items-center gap-1.5 text-xs font-bold text-white">
-              {renderIcon()}
-              {hotspot.title}
-            </span>
-            <span className="rounded-[4px] bg-[#153640] border border-[#80EAFF]/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#80EAFF]">
-              {hotspot.category === 'MONITOR'
-                ? 'WEEKLY SCHEDULE'
-                : hotspot.category === 'WHITEBOARD'
-                  ? 'WHITEBOARD TASKS'
-                  : hotspot.category === 'GRADES'
-                    ? 'STUDENT GRADES'
-                    : hotspot.category === 'DESK'
-                      ? 'LMS TASKS'
-                      : hotspot.category === 'DAILY_BUG'
-                        ? 'DAILY CHALLENGE'
-                        : hotspot.category === 'LEADERBOARD'
-                          ? 'TOP 10 STREAK'
-                          : hotspot.category.replace('_', ' ')}
-            </span>
-          </div>
-          <p className="text-xs text-[#9DB0B4] whitespace-pre-line leading-relaxed">
-            {hotspot.content}
-          </p>
-          {isExternalSystem && (
-            <p className="mt-2.5 inline-block rounded-[4px] bg-[#80EAFF] px-2.5 py-1 text-[11px] font-bold text-[#0D1A1D]">
-              Click to open{' '}
-              {hotspot.category === 'MONITOR'
-                ? 'Weekly Schedule'
-                : hotspot.category === 'GRADES'
-                  ? 'Student Grades'
-                  : hotspot.category === 'DAILY_BUG'
-                    ? 'Workstation Monitor'
-                    : hotspot.category === 'LEADERBOARD'
-                      ? 'Top 10 Leaderboard'
-                      : 'LMS Tasks'}{' '}
-              →
+          <div className="relative rounded-xl border border-[#2F4045] bg-[#233134] p-4 text-left shadow-[0_18px_48px_rgba(0,0,0,0.35)] overflow-hidden transition-all duration-150">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#80EAFF]" />
+            <div className="flex items-center justify-between gap-2 border-b border-[#2F4045] pb-2 mb-2">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-white">
+                {renderIcon()}
+                {hotspot.title}
+              </span>
+              <span className="rounded-[4px] bg-[#153640] border border-[#80EAFF]/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#80EAFF]">
+                {hotspot.category === 'MONITOR'
+                  ? 'WEEKLY SCHEDULE'
+                  : hotspot.category === 'WHITEBOARD'
+                    ? 'WHITEBOARD TASKS'
+                    : hotspot.category === 'GRADES'
+                      ? 'STUDENT GRADES'
+                      : hotspot.category === 'DESK'
+                        ? 'LMS TASKS'
+                        : hotspot.category === 'DAILY_BUG'
+                          ? 'DAILY CHALLENGE'
+                          : hotspot.category === 'LEADERBOARD'
+                            ? 'TOP 10 STREAK'
+                            : hotspot.category.replace('_', ' ')}
+              </span>
+            </div>
+            <p className="text-xs text-[#9DB0B4] whitespace-pre-line leading-relaxed">
+              {hotspot.content}
             </p>
-          )}
+            {isExternalSystem && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenSystemModal?.(hotspot)
+                }}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-[5px] bg-[#80EAFF] px-3 py-1.5 text-[11px] font-bold text-[#0D1A1D] hover:bg-[#A6F1FF] active:scale-[0.98] transition cursor-pointer shadow-sm"
+              >
+                <span>Click to open {getActionLabel()} →</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
