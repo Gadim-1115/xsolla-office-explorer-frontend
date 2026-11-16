@@ -29,7 +29,10 @@ interface ExplorerContextValue {
   selectedSceneId: string | null
   activeMapHotspot: HotspotDTO | null
   isCelebrationOpen: boolean
+  isGuideOpen: boolean
   closeCelebration: () => void
+  openGuideModal: () => void
+  closeGuideModal: (dontShowAgain?: boolean) => void
   openQuestModal: (zoneId: string) => void
   closeQuestModal: () => void
   openRoomModal: (zoneId: string, sceneId?: string) => void
@@ -49,6 +52,16 @@ function isExplorationComplete(p: ProgressDTO): boolean {
   return p.unlocked_zones_count >= p.total_locked_zones && p.found_eggs_count >= p.total_easter_eggs
 }
 
+const GUIDE_DISMISSED_KEY = 'xsolla_explorer_guide_dismissed_v1'
+
+function shouldShowGuideOnStartup(): boolean {
+  try {
+    return localStorage.getItem(GUIDE_DISMISSED_KEY) !== '1'
+  } catch {
+    return true
+  }
+}
+
 export function ExplorerProvider({ children }: { children: ReactNode }) {
   const [zones, setZones] = useState<Record<string, ZoneDTO>>({})
   const [mapHotspots, setMapHotspots] = useState<HotspotDTO[]>([])
@@ -62,6 +75,7 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
   const [activeMapHotspot, setActiveMapHotspot] = useState<HotspotDTO | null>(null)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const [isCelebrationOpen, setIsCelebrationOpen] = useState<boolean>(false)
+  const [isGuideOpen, setIsGuideOpen] = useState<boolean>(shouldShowGuideOnStartup)
   // latest progress, readable inside the stable callbacks below
   const progressRef = useRef<ProgressDTO | null>(null)
 
@@ -79,6 +93,19 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const closeCelebration = useCallback(() => setIsCelebrationOpen(false), [])
+  const openGuideModal = useCallback(() => setIsGuideOpen(true), [])
+  const closeGuideModal = useCallback((dontShowAgain = true) => {
+    setIsGuideOpen(false)
+    try {
+      if (dontShowAgain) {
+        localStorage.setItem(GUIDE_DISMISSED_KEY, '1')
+      } else {
+        localStorage.removeItem(GUIDE_DISMISSED_KEY)
+      }
+    } catch {
+      return
+    }
+  }, [])
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -180,7 +207,10 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
       selectedSceneId,
       activeMapHotspot,
       isCelebrationOpen,
+      isGuideOpen,
       closeCelebration,
+      openGuideModal,
+      closeGuideModal,
       openQuestModal: (zoneId: string) => setSelectedQuestZoneId(zoneId),
       closeQuestModal: () => setSelectedQuestZoneId(null),
       openRoomModal: (zoneId: string, sceneId?: string) => {
@@ -210,7 +240,10 @@ export function ExplorerProvider({ children }: { children: ReactNode }) {
       selectedSceneId,
       activeMapHotspot,
       isCelebrationOpen,
+      isGuideOpen,
       closeCelebration,
+      openGuideModal,
+      closeGuideModal,
       handleZoneUnlocked,
       handleEggClaimed,
       notify,

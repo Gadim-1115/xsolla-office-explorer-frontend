@@ -4,6 +4,7 @@ import { OfficeMapCanvas } from '../features/map-navigation/components/OfficeMap
 import { QuestModal } from '../features/algorithmic-quest/components/QuestModal'
 import { RoomModal } from '../features/room-inspector/components/RoomModal'
 import { CompletionCelebration } from '../features/onboarding-progress/components/CompletionCelebration'
+import { OnboardingGuideModal } from '../features/onboarding-progress/components/OnboardingGuideModal'
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
         <QuestModal />
         <RoomModal />
         <CompletionCelebration />
+        <OnboardingGuideModal />
       </div>
     </ExplorerProvider>
   )

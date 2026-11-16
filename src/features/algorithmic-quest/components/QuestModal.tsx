@@ -1,4 +1,4 @@
-import { Code2, Lock, Play, AlertCircle } from 'lucide-react'
+import { Code2, Lock, Play, AlertCircle, Puzzle } from 'lucide-react'
 import { Modal } from '../../../shared/ui/Modal'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
 import { useQuestSolver } from '../hooks/useQuestSolver'
@@ -14,6 +14,8 @@ const DIFFICULTY_STYLES: Record<string, string> = {
 export function QuestModal() {
   const { selectedQuestZoneId, closeQuestModal } = useExplorer()
   const {
+    mode,
+    setMode,
     quest,
     blocks,
     isLoading,
@@ -24,6 +26,7 @@ export function QuestModal() {
   } = useQuestSolver(selectedQuestZoneId)
 
   const isOpen = Boolean(selectedQuestZoneId)
+  const isPuzzle = mode === 'puzzle'
 
   const difficultyBadge = quest?.difficulty ? (
     <span
@@ -35,42 +38,115 @@ export function QuestModal() {
     </span>
   ) : null
 
+  const modeSwitcher = (
+    <div
+      role="group"
+      aria-label="Challenge mode selector"
+      className="inline-flex items-center rounded-[7px] border border-[#2F4045] bg-[#141E20] p-0.5"
+    >
+      <button
+        type="button"
+        onClick={() => setMode('algorithm')}
+        className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+          !isPuzzle
+            ? 'bg-[#80EAFF] text-[#0D1A1D] shadow-sm'
+            : 'text-[#9DB0B4] hover:text-white'
+        }`}
+      >
+        <Code2 className="h-3.5 w-3.5" />
+        <span>Algorithm</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode('puzzle')}
+        className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+          isPuzzle
+            ? 'bg-violet-400 text-[#120E24] shadow-sm'
+            : 'text-[#9DB0B4] hover:text-white'
+        }`}
+      >
+        <Puzzle className="h-3.5 w-3.5" />
+        <span>Puzzle</span>
+      </button>
+    </div>
+  )
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={closeQuestModal}
-      title={quest ? quest.title : 'Algorithmic Security Lock'}
+      title={
+        quest
+          ? quest.title
+          : isPuzzle
+            ? 'Logic Puzzle Lock'
+            : 'Algorithmic Security Lock'
+      }
       subtitle={
         quest
-          ? `Unlock ${quest.zone_name} by ordering the Go code blocks below`
+          ? isPuzzle
+            ? `Unlock ${quest.zone_name} by solving the logic puzzle below (no coding required)`
+            : `Unlock ${quest.zone_name} by ordering the Go code blocks below`
           : 'Loading challenge...'
       }
       badge={difficultyBadge}
+      headerAction={modeSwitcher}
       maxWidthClass="max-w-2xl"
     >
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-12 text-[#9DB0B4]">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#80EAFF]/70 border-t-transparent mb-3" />
-          <p className="text-sm font-medium">Loading algorithmic quest...</p>
+          <p className="text-sm font-medium">
+            {isPuzzle ? 'Loading logic puzzle...' : 'Loading algorithmic quest...'}
+          </p>
         </div>
       ) : quest ? (
         <div className="flex flex-col gap-5 text-left">
-          <div className="relative rounded-[6px] border border-[#80EAFF]/40 bg-[#153640] p-4 overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#80EAFF]" />
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#80EAFF] mb-1.5">
-              <Code2 className="h-4 w-4" />
-              Problem Statement
+          <div
+            className={`relative rounded-[6px] border p-4 overflow-hidden ${
+              isPuzzle
+                ? 'border-violet-400/40 bg-[#1D1B33]'
+                : 'border-[#80EAFF]/40 bg-[#153640]'
+            }`}
+          >
+            <div
+              className={`absolute top-0 left-0 right-0 h-[3px] ${
+                isPuzzle ? 'bg-violet-400' : 'bg-[#80EAFF]'
+              }`}
+            />
+            <div
+              className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-1.5 ${
+                isPuzzle ? 'text-violet-300' : 'text-[#80EAFF]'
+              }`}
+            >
+              {isPuzzle ? (
+                <>
+                  <Puzzle className="h-4 w-4" />
+                  <span>Puzzle Clues</span>
+                </>
+              ) : (
+                <>
+                  <Code2 className="h-4 w-4" />
+                  <span>Problem Statement</span>
+                </>
+              )}
             </div>
-            <p className="text-sm text-white leading-relaxed font-medium">
+            <p className="whitespace-pre-line text-sm text-white leading-relaxed font-medium">
               {quest.problem_statement}
             </p>
           </div>
 
           <div>
             <p className="mb-2.5 text-xs font-medium text-[#9DB0B4]">
-              Drag and drop the lines below into the valid Go execution order:
+              {isPuzzle
+                ? 'Drag and drop the cards below into the correct order from top (#1) to bottom:'
+                : 'Drag and drop the lines below into the valid Go execution order:'}
             </p>
-            <SortableCodeList blocks={blocks} onReorder={reorderBlocks} />
+            <SortableCodeList
+              blocks={blocks}
+              onReorder={reorderBlocks}
+              mode={mode}
+            />
           </div>
 
           {errorMessage && (
@@ -82,8 +158,16 @@ export function QuestModal() {
 
           <div className="flex items-center justify-between border-t border-[#2F4045] pt-4">
             <div className="flex items-center gap-2 text-xs text-[#9DB0B4]">
-              <Lock className="h-3.5 w-3.5 text-[#80EAFF]" />
-              <span>Verified server-side against anti-cheat rules</span>
+              <Lock
+                className={`h-3.5 w-3.5 ${
+                  isPuzzle ? 'text-violet-300' : 'text-[#80EAFF]'
+                }`}
+              />
+              <span>
+                {isPuzzle
+                  ? 'Mode saved automatically for all locked rooms'
+                  : 'Verified server-side against anti-cheat rules'}
+              </span>
             </div>
             <div className="flex items-center gap-2.5">
               <button
@@ -97,7 +181,11 @@ export function QuestModal() {
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => void submitSolution()}
-                className="flex items-center gap-2 rounded-[6px] bg-[#80EAFF] px-5 py-2.5 text-xs font-semibold text-[#0D1A1D] hover:bg-[#A6F1FF] disabled:opacity-50 transition cursor-pointer"
+                className={`flex items-center gap-2 rounded-[6px] px-5 py-2.5 text-xs font-semibold disabled:opacity-50 transition cursor-pointer ${
+                  isPuzzle
+                    ? 'bg-violet-400 text-[#120E24] hover:bg-violet-300'
+                    : 'bg-[#80EAFF] text-[#0D1A1D] hover:bg-[#A6F1FF]'
+                }`}
               >
                 <Play className="h-3.5 w-3.5 fill-current" />
                 {isSubmitting ? 'Verifying...' : 'Verify & Unlock Zone'}

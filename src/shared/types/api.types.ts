@@ -1,5 +1,7 @@
 export type Difficulty = 'EASY' | 'MEDIUM' | 'MEDIUM_HARD' | 'HARD'
 
+export type QuestChallengeMode = 'algorithm' | 'puzzle'
+
 export type ZoneStatus = 'LOCKED' | 'UNLOCKED'
 
 export type HotspotCategory =
@@ -81,12 +83,14 @@ export interface QuestDTO {
   zone_id: string
   zone_name: string
   difficulty: Difficulty | null
+  mode?: QuestChallengeMode
   title: string
   problem_statement: string
   code_blocks: CodeBlockDTO[]
 }
 
 export interface VerifyQuestRequestDTO {
+  mode?: QuestChallengeMode
   submitted_order: string[]
 }
 

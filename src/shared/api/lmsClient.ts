@@ -1469,25 +1469,212 @@ export async function fetchLmsMyProfileAvatar(): Promise<string | null> {
   return resolved
 }
 
+export interface LmsDirectorySyncUser {
+  user_id: string
+  user_name: string
+  user_role: string
+  avatar_url: string | null
+}
+
+export interface LmsDirectorySnapshot {
+  available: boolean
+  activeIds: Set<string>
+  users: LmsDirectorySyncUser[]
+  names: Record<string, string>
+  avatars: Record<string, string>
+}
+
+interface RawDirectoryUser {
+  id: number | string
+  name?: string
+  email?: string
+  role?: string
+  roles?: string[]
+  avatar_url?: string | null
+  active?: boolean
+  left_at?: string | null
+}
+
+export async function refreshLmsCurrentUser(): Promise<{
+  user: LmsUser | null
+  deletedUserId?: string
+}> {
+  const cached = getLmsUser()
+  if (!cached) return { user: null }
+  if (!isLiveLmsBackend()) return { user: cached }
+
+  const apiUrl = getLmsApiUrl()
+  const tokens = getLmsTokens()
+  if (!apiUrl || !tokens?.accessToken) return { user: cached }
+
+  const callMe = async (accessToken: string) =>
+    fetch(`${apiUrl}/users/me`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+  try {
+    let activeToken = tokens.accessToken
+    let res = await callMe(activeToken)
+
+    if (res.status === 401 && tokens.refreshToken) {
+      const refreshRes = await fetch(`${apiUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ refresh_token: tokens.refreshToken }),
+      })
+      if (refreshRes.ok) {
+        const nextTokens = (await refreshRes.json()) as {
+          access_token: string
+          refresh_token: string
+        }
+        activeToken = nextTokens.access_token
+        localStorage.setItem(
+          TOKENS_STORAGE_KEY,
+          JSON.stringify({
+            accessToken: nextTokens.access_token,
+            refreshToken: nextTokens.refresh_token,
+          }),
+        )
+        res = await callMe(activeToken)
+      }
+    }
+
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      const deletedUserId = `lms-${cached.id}`
+      clearLmsSession()
+      return { user: null, deletedUserId }
+    }
+
+    if (!res.ok) {
+      return { user: cached }
+    }
+
+    const rawMe = (await res.json()) as RawDirectoryUser
+    if (rawMe.active === false || Boolean(rawMe.left_at)) {
+      const deletedUserId = `lms-${cached.id}`
+      clearLmsSession()
+      return { user: null, deletedUserId }
+    }
+
+    let profileAvatar: string | null = null
+    try {
+      const profRes = await fetch(`${apiUrl}/users/me/profile`, {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${activeToken}`,
+        },
+      })
+      if (profRes.ok) {
+        const prof = (await profRes.json()) as { avatar_url?: string | null }
+        if (typeof prof.avatar_url === 'string' && prof.avatar_url.trim()) {
+          profileAvatar = prof.avatar_url.trim()
+        }
+      }
+    } catch {
+      profileAvatar = null
+    }
+
+    const updated = normalizeUser({
+      ...rawMe,
+      avatar_url: profileAvatar || rawMe.avatar_url || cached.avatarUrl,
+    })
+    if (updated) {
+      const resolvedAvatar = resolveLmsAvatarUrl(updated.avatarUrl)
+      const finalUser: LmsUser = {
+        ...updated,
+        avatarUrl: resolvedAvatar ?? updated.avatarUrl ?? null,
+      }
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(finalUser))
+      return { user: finalUser }
+    }
+    return { user: cached }
+  } catch {
+    return { user: cached }
+  }
+}
+
+export async function fetchLmsDirectorySnapshot(): Promise<LmsDirectorySnapshot> {
+  const empty: LmsDirectorySnapshot = {
+    available: false,
+    activeIds: new Set<string>(),
+    users: [],
+    names: {},
+    avatars: {},
+  }
+  const user = getLmsUser()
+  if (!user || !isLiveLmsBackend()) {
+    return empty
+  }
+
+  let rawUsers: RawDirectoryUser[] | null = null
+  try {
+    const res = await lmsAuthedRequest<RawDirectoryUser[] | null>('/users?search=')
+    if (Array.isArray(res)) {
+      rawUsers = res
+    }
+  } catch {
+    try {
+      const res = await lmsAuthedRequest<RawDirectoryUser[] | null>('/users')
+      if (Array.isArray(res)) {
+        rawUsers = res
+      }
+    } catch {
+      rawUsers = null
+    }
+  }
+
+  if (!rawUsers) {
+    return empty
+  }
+
+  const activeIds = new Set<string>()
+  const users: LmsDirectorySyncUser[] = []
+  const names: Record<string, string> = {}
+  const avatars: Record<string, string> = {}
+
+  for (const u of rawUsers) {
+    if (u.active === false || Boolean(u.left_at)) continue
+    const userId = `lms-${u.id}`
+    const name = typeof u.name === 'string' && u.name.trim() ? u.name.trim() : 'Student'
+    const normalized = normalizeUser(u)
+    const roleLabel = normalized ? getLmsRoleLabel(normalized) : 'Student'
+    const resolvedAvatar = resolveLmsAvatarUrl(u.avatar_url)
+
+    activeIds.add(userId)
+    names[userId] = name
+    if (resolvedAvatar) {
+      avatars[userId] = resolvedAvatar
+      avatars[name.toLowerCase()] = resolvedAvatar
+    }
+    users.push({
+      user_id: userId,
+      user_name: name,
+      user_role: roleLabel,
+      avatar_url: resolvedAvatar,
+    })
+  }
+
+  return {
+    available: true,
+    activeIds,
+    users,
+    names,
+    avatars,
+  }
+}
+
 export async function fetchLmsDirectoryNames(): Promise<Record<string, string>> {
   const names: Record<string, string> = {}
   const user = getLmsUser()
   if (user?.name) {
     names[`lms-${user.id}`] = user.name.trim()
   }
-  if (!user || !isLiveLmsBackend()) {
-    return names
-  }
-  try {
-    const users =
-      (await lmsAuthedRequest<{ id: number | string; name?: string }[] | null>('/users')) ?? []
-    for (const u of users) {
-      if (u.name && u.name.trim()) {
-        names[`lms-${u.id}`] = u.name.trim()
-      }
-    }
-  } catch (err) {
-    void err
+  const snapshot = await fetchLmsDirectorySnapshot()
+  if (snapshot.available) {
+    Object.assign(names, snapshot.names)
   }
   const refreshedUser = getLmsUser()
   if (refreshedUser?.name) {
@@ -1520,22 +1707,9 @@ export async function fetchLmsDirectoryAvatars(): Promise<Record<string, string>
     void err
   }
 
-  try {
-    const users =
-      (await lmsAuthedRequest<
-        { id: number | string; name?: string; avatar_url?: string | null }[] | null
-      >('/users')) ?? []
-    for (const u of users) {
-      const resolved = resolveLmsAvatarUrl(u.avatar_url)
-      if (resolved) {
-        map[`lms-${u.id}`] = resolved
-        if (u.name) {
-          map[u.name.trim().toLowerCase()] = resolved
-        }
-      }
-    }
-  } catch (err) {
-    void err
+  const snapshot = await fetchLmsDirectorySnapshot()
+  if (snapshot.available) {
+    Object.assign(map, snapshot.avatars)
   }
 
   return map

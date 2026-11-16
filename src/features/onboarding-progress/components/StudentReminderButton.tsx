@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   AlertCircle,
+  Bell,
+  BellRing,
   Calendar,
   CheckCircle2,
   ClipboardList,
@@ -104,18 +106,20 @@ export function StudentReminderButton({ user }: StudentReminderButtonProps) {
         }}
         title="Open Student LMS Reminders"
         aria-label="Open Student LMS Reminders"
-        className={`relative flex h-9 items-center justify-center gap-1 rounded-[6px] border px-2.5 text-xs font-black transition cursor-pointer ${
+        className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] border transition cursor-pointer ${
           actionableCount > 0
-            ? 'border-rose-500 bg-rose-500/20 text-rose-400 shadow-[0_0_16px_rgba(244,63,94,0.35)] hover:bg-rose-500 hover:text-white'
-            : 'border-rose-500/60 bg-[#2A1B20] text-rose-400 hover:bg-rose-500 hover:text-white'
+            ? 'border-rose-500/80 bg-rose-500/15 text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.28)] hover:bg-rose-500 hover:text-white'
+            : 'border-[#2F4045] bg-[#1D2A2D] text-[#9DB0B4] hover:border-[#80EAFF]/60 hover:text-[#80EAFF]'
         }`}
       >
-        <span className="font-mono text-sm font-black tracking-tighter text-rose-400 group-hover:text-white">
-          !!
-        </span>
+        {actionableCount > 0 ? (
+          <BellRing className="h-4 w-4 transition-transform group-hover:scale-110" />
+        ) : (
+          <Bell className="h-4 w-4 transition-transform group-hover:scale-110" />
+        )}
         {actionableCount > 0 && (
-          <span className="ml-0.5 rounded-full bg-rose-500 px-1.5 py-0.2 text-[10px] font-bold text-white">
-            {actionableCount}
+          <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#141E20] bg-rose-500 px-1 text-[10px] font-extrabold leading-none text-white shadow-sm">
+            {actionableCount > 9 ? '9+' : actionableCount}
           </span>
         )}
       </button>
@@ -134,8 +138,8 @@ export function StudentReminderButton({ user }: StudentReminderButtonProps) {
 
               <div className="flex items-center justify-between border-b border-[#2F4045] bg-[#141E20] px-5 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-500/50 bg-rose-500/15 font-mono text-base font-black text-rose-400">
-                    !!
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-500/50 bg-rose-500/15 text-rose-400">
+                    <BellRing className="h-5 w-5" />
                   </div>
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">

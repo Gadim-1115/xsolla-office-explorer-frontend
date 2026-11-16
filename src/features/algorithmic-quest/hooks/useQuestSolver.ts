@@ -1,17 +1,44 @@
 import { useCallback, useEffect, useState } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
-import type { CodeBlockDTO, QuestDTO } from '../../../shared/types/api.types'
+import type {
+  CodeBlockDTO,
+  QuestChallengeMode,
+  QuestDTO,
+} from '../../../shared/types/api.types'
 import { fetchQuestByZone, verifyQuestSequence } from '../api/questService'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
+
+const QUEST_MODE_STORAGE_KEY = 'xsolla_explorer_quest_mode'
+
+function readStoredQuestMode(): QuestChallengeMode {
+  try {
+    return localStorage.getItem(QUEST_MODE_STORAGE_KEY) === 'puzzle'
+      ? 'puzzle'
+      : 'algorithm'
+  } catch {
+    return 'algorithm'
+  }
+}
 
 export function useQuestSolver(zoneId: string | null) {
   const { handleZoneUnlocked, notify } = useExplorer()
 
+  const [mode, setModeState] = useState<QuestChallengeMode>(readStoredQuestMode)
   const [quest, setQuest] = useState<QuestDTO | null>(null)
   const [blocks, setBlocks] = useState<CodeBlockDTO[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const setMode = useCallback((nextMode: QuestChallengeMode) => {
+    setModeState(nextMode)
+    setErrorMessage(null)
+    try {
+      localStorage.setItem(QUEST_MODE_STORAGE_KEY, nextMode)
+    } catch {
+      return
+    }
+  }, [])
 
   useEffect(() => {
     if (!zoneId) {
@@ -25,7 +52,7 @@ export function useQuestSolver(zoneId: string | null) {
     setIsLoading(true)
     setErrorMessage(null)
 
-    fetchQuestByZone(zoneId)
+    fetchQuestByZone(zoneId, mode)
       .then((data) => {
         if (cancelled) return
         setQuest(data)
@@ -33,7 +60,7 @@ export function useQuestSolver(zoneId: string | null) {
       })
       .catch((err) => {
         if (cancelled) return
-        const msg = err instanceof Error ? err.message : 'Failed to load quest'
+        const msg = err instanceof Error ? err.message : 'Failed to load challenge'
         setErrorMessage(msg)
       })
       .finally(() => {
@@ -43,7 +70,7 @@ export function useQuestSolver(zoneId: string | null) {
     return () => {
       cancelled = true
     }
-  }, [zoneId])
+  }, [zoneId, mode])
 
   const reorderBlocks = useCallback((activeId: string, overId: string) => {
     setErrorMessage(null)
@@ -61,21 +88,25 @@ export function useQuestSolver(zoneId: string | null) {
       setIsSubmitting(true)
       setErrorMessage(null)
       const submittedIds = blocks.map((b) => b.id)
-      const result = await verifyQuestSequence(zoneId, submittedIds)
+      const result = await verifyQuestSequence(zoneId, submittedIds, mode)
       handleZoneUnlocked(result.unlocked_zone, result.progress)
     } catch (err) {
       const msg =
         err instanceof Error
           ? err.message
-          : 'Incorrect sequence. Check the execution order and try again!'
+          : mode === 'puzzle'
+            ? 'Incorrect puzzle order. Re-check the clues and try again!'
+            : 'Incorrect sequence. Check the execution order and try again!'
       setErrorMessage(msg)
       notify('error', 'Verification Failed', msg)
     } finally {
       setIsSubmitting(false)
     }
-  }, [zoneId, blocks, handleZoneUnlocked, notify])
+  }, [zoneId, blocks, mode, handleZoneUnlocked, notify])
 
   return {
+    mode,
+    setMode,
     quest,
     blocks,
     isLoading,

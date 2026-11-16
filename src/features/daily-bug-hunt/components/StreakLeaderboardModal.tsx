@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Crown, Flame, User, X } from 'lucide-react'
 import { getLmsUser } from '../../../shared/api/lmsClient'
 import {
@@ -142,10 +143,10 @@ export function StreakLeaderboardModal({
     )
   }
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[75] flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -312,6 +313,7 @@ export function StreakLeaderboardModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

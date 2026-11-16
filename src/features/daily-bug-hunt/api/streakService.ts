@@ -1,11 +1,13 @@
 import { httpRequest } from '../../../shared/api/httpClient'
 import {
   fetchLmsDirectoryAvatars,
-  fetchLmsDirectoryNames,
+  fetchLmsDirectorySnapshot,
   fetchLmsMyProfileAvatar,
   getLmsRoleLabel,
   getLmsUser,
+  refreshLmsCurrentUser,
   resolveLmsAvatarUrl,
+  type LmsDirectorySnapshot,
   type LmsUser,
 } from '../../../shared/api/lmsClient'
 import {
@@ -290,14 +292,70 @@ export async function recordDailyBugSolved(user: LmsUser | null): Promise<{
   }
 }
 
+export async function syncLeaderboardWithLms(): Promise<{
+  snapshot: LmsDirectorySnapshot
+  currentUser: LmsUser | null
+}> {
+  const { user: currentUser, deletedUserId } = await refreshLmsCurrentUser()
+  if (deletedUserId) {
+    const localMap = readRecordsMap()
+    if (localMap[deletedUserId]) {
+      delete localMap[deletedUserId]
+      writeRecordsMap(localMap)
+    }
+    await httpRequest(`/explorer/streak/${encodeURIComponent(deletedUserId)}`, {
+      method: 'DELETE',
+    }).catch(() => undefined)
+  }
+
+  const emptySnapshot: LmsDirectorySnapshot = {
+    available: false,
+    activeIds: new Set<string>(),
+    users: [],
+    names: {},
+    avatars: {},
+  }
+  const snapshot: LmsDirectorySnapshot = await fetchLmsDirectorySnapshot().catch(
+    () => emptySnapshot,
+  )
+
+  if (snapshot.available) {
+    const localMap = readRecordsMap()
+    const prunedMap: Record<string, UserStreakRecord> = {}
+    for (const [id, rec] of Object.entries(localMap)) {
+      if (id.startsWith('lms-') && !snapshot.activeIds.has(id)) {
+        continue
+      }
+      prunedMap[id] = {
+        ...rec,
+        userName: snapshot.names[id] || rec.userName,
+        ...(snapshot.avatars[id] ? { avatarUrl: snapshot.avatars[id] } : {}),
+      }
+    }
+    writeRecordsMap(prunedMap)
+
+    await httpRequest('/explorer/leaderboard/sync', {
+      method: 'POST',
+      body: JSON.stringify({
+        prune_missing: true,
+        users: snapshot.users,
+      }),
+    }).catch(() => undefined)
+  }
+
+  return { snapshot, currentUser }
+}
+
 export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
-  const map = readRecordsMap()
-  const [directoryAvatars, directoryNames] = await Promise.all([
+  const [{ snapshot, currentUser: refreshedUser }, directoryAvatars] = await Promise.all([
+    syncLeaderboardWithLms(),
     fetchLmsDirectoryAvatars().catch(() => ({} as Record<string, string>)),
-    fetchLmsDirectoryNames().catch(() => ({} as Record<string, string>)),
   ])
-  const currentUser = getLmsUser()
+  const currentUser = refreshedUser ?? getLmsUser()
   const currentUserId = currentUser ? `lms-${currentUser.id}` : null
+
+  const activeMap: Record<string, UserStreakRecord> = {}
+  let fetchedRemote = false
 
   try {
     const remoteRows = await httpRequest<
@@ -312,30 +370,33 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
       }[]
     >('/explorer/leaderboard')
     if (Array.isArray(remoteRows)) {
+      fetchedRemote = true
       for (const row of remoteRows) {
         if (!row.user_id || row.user_id.startsWith('seed-')) continue
-        const local = map[row.user_id]
+        if (snapshot.available && row.user_id.startsWith('lms-') && !snapshot.activeIds.has(row.user_id)) {
+          continue
+        }
         const isCurrentUser = Boolean(currentUser && row.user_id === currentUserId)
         const latestName =
-          (isCurrentUser ? currentUser?.name : directoryNames[row.user_id]) ||
+          (isCurrentUser ? currentUser?.name : snapshot.names[row.user_id]) ||
           row.user_name ||
-          local?.userName ||
           'Student'
         const latestRole =
           (isCurrentUser && currentUser ? getLmsRoleLabel(currentUser) : row.user_role) ||
-          local?.userRole ||
           'Student'
 
-        if (!local || row.streak >= local.streak) {
-          map[row.user_id] = {
-            userId: row.user_id,
-            userName: latestName,
-            userRole: latestRole,
-            streak: row.streak,
-            lastSolvedDate: row.last_solved_date,
-            solvedAt: row.solved_at || local?.solvedAt || null,
-            avatarUrl: resolveLmsAvatarUrl(row.avatar_url) || local?.avatarUrl || null,
-          }
+        activeMap[row.user_id] = {
+          userId: row.user_id,
+          userName: latestName,
+          userRole: latestRole,
+          streak: row.streak,
+          lastSolvedDate: row.last_solved_date,
+          solvedAt: row.solved_at || null,
+          avatarUrl:
+            (isCurrentUser ? resolveLmsAvatarUrl(currentUser?.avatarUrl) : undefined) ||
+            snapshot.avatars[row.user_id] ||
+            resolveLmsAvatarUrl(row.avatar_url) ||
+            null,
         }
 
         if (isCurrentUser && currentUser && row.user_name !== currentUser.name && row.last_solved_date) {
@@ -346,36 +407,41 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
               user_name: currentUser.name,
               user_role: latestRole,
               date_key: row.last_solved_date,
-              avatar_url: map[row.user_id]?.avatarUrl ?? null,
+              avatar_url: activeMap[row.user_id]?.avatarUrl ?? null,
             }),
           }).catch(() => undefined)
         }
       }
-      writeRecordsMap(map)
+      writeRecordsMap(activeMap)
     }
   } catch (err) {
     void err
   }
 
-  for (const [id, rec] of Object.entries(map)) {
+  const finalMap = fetchedRemote ? activeMap : readRecordsMap()
+  for (const [id, rec] of Object.entries(finalMap)) {
+    if (snapshot.available && id.startsWith('lms-') && !snapshot.activeIds.has(id)) {
+      delete finalMap[id]
+      continue
+    }
     const isCurrentUser = Boolean(currentUser && id === currentUserId)
     const updatedName =
-      (isCurrentUser ? currentUser?.name : directoryNames[id]) || rec.userName
+      (isCurrentUser ? currentUser?.name : snapshot.names[id]) || rec.userName
     const updatedRole =
       isCurrentUser && currentUser ? getLmsRoleLabel(currentUser) : rec.userRole
-    const byId = directoryAvatars[id]
+    const byId = snapshot.avatars[id] || directoryAvatars[id]
     const byName = updatedName ? directoryAvatars[updatedName.trim().toLowerCase()] : undefined
     const lmsAvatar = byId || byName
-    map[id] = {
+    finalMap[id] = {
       ...rec,
       userName: updatedName,
       userRole: updatedRole,
       ...(lmsAvatar ? { avatarUrl: lmsAvatar } : {}),
     }
   }
-  writeRecordsMap(map)
+  writeRecordsMap(finalMap)
 
-  const normalized = Object.values(map)
+  const normalized = Object.values(finalMap)
     .map(normalizeStreakStatus)
     .filter((entry) => entry.streak > 0)
     .sort((a, b) => {
