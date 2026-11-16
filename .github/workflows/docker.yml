@@ -19,6 +19,14 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Validate API base URL
+      - name: Validate API base URL
+        run: |
+          test -n "$VITE_API_BASE_URL" || {
+            echo "::error::VITE_API_BASE_URL is required"
+            exit 1
+          }
+
       # <commit sha> on every push; "latest" only from the default branch
       - id: meta
         uses: docker/metadata-action@v5
@@ -36,3 +44,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            VITE_API_BASE_URL=/api/v1
