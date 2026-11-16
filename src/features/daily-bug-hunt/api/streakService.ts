@@ -1,8 +1,10 @@
 import { httpRequest } from '../../../shared/api/httpClient'
 import {
   fetchLmsDirectoryAvatars,
+  fetchLmsDirectoryNames,
   fetchLmsMyProfileAvatar,
   getLmsRoleLabel,
+  getLmsUser,
   resolveLmsAvatarUrl,
   type LmsUser,
 } from '../../../shared/api/lmsClient'
@@ -17,6 +19,7 @@ export interface UserStreakRecord {
   userRole: string
   streak: number
   lastSolvedDate: string | null
+  solvedAt?: string | null
   avatarUrl?: string | null
 }
 
@@ -27,6 +30,7 @@ export interface UserStreakStatus {
   streak: number
   solvedToday: boolean
   lastSolvedDate: string | null
+  solvedAt: string | null
   avatarUrl: string | null
 }
 
@@ -38,6 +42,7 @@ export interface LeaderboardEntry {
   streak: number
   solvedToday: boolean
   lastSolvedDate: string | null
+  solvedAt: string | null
   avatarUrl: string | null
 }
 
@@ -94,6 +99,7 @@ export function normalizeStreakStatus(record: UserStreakRecord): UserStreakStatu
     streak: isStreakAlive ? Math.max(0, record.streak) : 0,
     solvedToday,
     lastSolvedDate: record.lastSolvedDate,
+    solvedAt: record.solvedAt ?? null,
     avatarUrl: resolveLmsAvatarUrl(record.avatarUrl) ?? record.avatarUrl ?? null,
   }
 }
@@ -112,8 +118,14 @@ export function getUserStreakStatus(user: LmsUser | null): UserStreakStatus | nu
       streak: 0,
       solvedToday: false,
       lastSolvedDate: null,
+      solvedAt: null,
       avatarUrl: resolvedUserAvatar,
     }
+  }
+  if (user.name && existing.userName !== user.name) {
+    existing.userName = user.name
+    existing.userRole = getLmsRoleLabel(user)
+    writeRecordsMap(map)
   }
   return normalizeStreakStatus({
     ...existing,
@@ -127,6 +139,8 @@ export async function syncUserStreakFromBackend(user: LmsUser | null): Promise<U
   if (!user) return null
   const userId = `lms-${user.id}`
   const liveAvatar = await fetchLmsMyProfileAvatar().catch(() => resolveLmsAvatarUrl(user.avatarUrl))
+  const latestUser = getLmsUser() ?? user
+  const latestRole = getLmsRoleLabel(latestUser)
   try {
     const remote = await httpRequest<{
       user_id: string
@@ -134,6 +148,7 @@ export async function syncUserStreakFromBackend(user: LmsUser | null): Promise<U
       user_role: string
       streak: number
       last_solved_date: string | null
+      solved_at?: string | null
       avatar_url?: string | null
     }>(`/explorer/streak?user_id=${encodeURIComponent(userId)}`)
     if (remote && typeof remote.streak === 'number') {
@@ -146,28 +161,50 @@ export async function syncUserStreakFromBackend(user: LmsUser | null): Promise<U
             ? local.lastSolvedDate
             : remote.last_solved_date
           : local?.lastSolvedDate || remote.last_solved_date || null
+      const mergedSolvedAt = remote.solved_at || local?.solvedAt || null
+      const resolvedAvatar =
+        liveAvatar || resolveLmsAvatarUrl(remote.avatar_url) || local?.avatarUrl || null
       map[userId] = {
         userId,
-        userName: user.name,
-        userRole: getLmsRoleLabel(user),
+        userName: latestUser.name,
+        userRole: latestRole,
         streak: mergedStreak,
         lastSolvedDate: mergedDate,
-        avatarUrl: liveAvatar || resolveLmsAvatarUrl(remote.avatar_url) || local?.avatarUrl || null,
+        solvedAt: mergedSolvedAt,
+        avatarUrl: resolvedAvatar,
       }
       writeRecordsMap(map)
+
+      if (
+        mergedStreak > 0 &&
+        mergedDate &&
+        (remote.user_name !== latestUser.name || remote.user_role !== latestRole)
+      ) {
+        void httpRequest('/explorer/streak/complete', {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: userId,
+            user_name: latestUser.name,
+            user_role: latestRole,
+            date_key: mergedDate,
+            avatar_url: resolvedAvatar,
+          }),
+        }).catch(() => undefined)
+      }
+
       window.dispatchEvent(new CustomEvent(STREAK_UPDATED_EVENT))
     }
   } catch {
     if (liveAvatar) {
       const map = readRecordsMap()
       if (map[userId]) {
-        map[userId] = { ...map[userId], avatarUrl: liveAvatar }
+        map[userId] = { ...map[userId], userName: latestUser.name, avatarUrl: liveAvatar }
         writeRecordsMap(map)
       }
     }
-    return getUserStreakStatus(user)
+    return getUserStreakStatus(latestUser)
   }
-  return getUserStreakStatus(user)
+  return getUserStreakStatus(latestUser)
 }
 
 export async function recordDailyBugSolved(user: LmsUser | null): Promise<{
@@ -192,8 +229,12 @@ export async function recordDailyBugSolved(user: LmsUser | null): Promise<{
   const existing = map[userId]
 
   if (existing && existing.lastSolvedDate === today) {
-    if (liveAvatar && existing.avatarUrl !== liveAvatar) {
-      existing.avatarUrl = liveAvatar
+    const nameChanged = existing.userName !== user.name
+    const avatarChanged = Boolean(liveAvatar && existing.avatarUrl !== liveAvatar)
+    if (nameChanged || avatarChanged) {
+      existing.userName = user.name
+      existing.userRole = userRole
+      if (liveAvatar) existing.avatarUrl = liveAvatar
       writeRecordsMap(map)
     }
     return {
@@ -205,12 +246,14 @@ export async function recordDailyBugSolved(user: LmsUser | null): Promise<{
 
   const prevStreak =
     existing && existing.lastSolvedDate === yesterday ? Math.max(0, existing.streak) : 0
+  const solvedAtIso = new Date().toISOString()
   const nextRecord: UserStreakRecord = {
     userId,
     userName: user.name,
     userRole,
     streak: prevStreak + 1,
     lastSolvedDate: today,
+    solvedAt: solvedAtIso,
     avatarUrl: liveAvatar || existing?.avatarUrl || null,
   }
 
@@ -218,7 +261,7 @@ export async function recordDailyBugSolved(user: LmsUser | null): Promise<{
   writeRecordsMap(map)
 
   try {
-    await httpRequest('/explorer/streak/complete', {
+    const saved = await httpRequest<{ solved_at?: string | null }>('/explorer/streak/complete', {
       method: 'POST',
       body: JSON.stringify({
         user_id: userId,
@@ -228,6 +271,11 @@ export async function recordDailyBugSolved(user: LmsUser | null): Promise<{
         avatar_url: nextRecord.avatarUrl,
       }),
     })
+    if (saved?.solved_at) {
+      nextRecord.solvedAt = saved.solved_at
+      map[userId] = nextRecord
+      writeRecordsMap(map)
+    }
   } catch (err) {
     void err
   }
@@ -244,7 +292,12 @@ export async function recordDailyBugSolved(user: LmsUser | null): Promise<{
 
 export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
   const map = readRecordsMap()
-  const directoryAvatars = await fetchLmsDirectoryAvatars().catch(() => ({} as Record<string, string>))
+  const [directoryAvatars, directoryNames] = await Promise.all([
+    fetchLmsDirectoryAvatars().catch(() => ({} as Record<string, string>)),
+    fetchLmsDirectoryNames().catch(() => ({} as Record<string, string>)),
+  ])
+  const currentUser = getLmsUser()
+  const currentUserId = currentUser ? `lms-${currentUser.id}` : null
 
   try {
     const remoteRows = await httpRequest<
@@ -254,6 +307,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
         user_role: string
         streak: number
         last_solved_date: string | null
+        solved_at?: string | null
         avatar_url?: string | null
       }[]
     >('/explorer/leaderboard')
@@ -261,15 +315,40 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
       for (const row of remoteRows) {
         if (!row.user_id || row.user_id.startsWith('seed-')) continue
         const local = map[row.user_id]
+        const isCurrentUser = Boolean(currentUser && row.user_id === currentUserId)
+        const latestName =
+          (isCurrentUser ? currentUser?.name : directoryNames[row.user_id]) ||
+          row.user_name ||
+          local?.userName ||
+          'Student'
+        const latestRole =
+          (isCurrentUser && currentUser ? getLmsRoleLabel(currentUser) : row.user_role) ||
+          local?.userRole ||
+          'Student'
+
         if (!local || row.streak >= local.streak) {
           map[row.user_id] = {
             userId: row.user_id,
-            userName: row.user_name,
-            userRole: row.user_role || 'Student',
+            userName: latestName,
+            userRole: latestRole,
             streak: row.streak,
             lastSolvedDate: row.last_solved_date,
+            solvedAt: row.solved_at || local?.solvedAt || null,
             avatarUrl: resolveLmsAvatarUrl(row.avatar_url) || local?.avatarUrl || null,
           }
+        }
+
+        if (isCurrentUser && currentUser && row.user_name !== currentUser.name && row.last_solved_date) {
+          void httpRequest('/explorer/streak/complete', {
+            method: 'POST',
+            body: JSON.stringify({
+              user_id: row.user_id,
+              user_name: currentUser.name,
+              user_role: latestRole,
+              date_key: row.last_solved_date,
+              avatar_url: map[row.user_id]?.avatarUrl ?? null,
+            }),
+          }).catch(() => undefined)
         }
       }
       writeRecordsMap(map)
@@ -279,13 +358,22 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
   }
 
   for (const [id, rec] of Object.entries(map)) {
+    const isCurrentUser = Boolean(currentUser && id === currentUserId)
+    const updatedName =
+      (isCurrentUser ? currentUser?.name : directoryNames[id]) || rec.userName
+    const updatedRole =
+      isCurrentUser && currentUser ? getLmsRoleLabel(currentUser) : rec.userRole
     const byId = directoryAvatars[id]
-    const byName = rec.userName ? directoryAvatars[rec.userName.trim().toLowerCase()] : undefined
+    const byName = updatedName ? directoryAvatars[updatedName.trim().toLowerCase()] : undefined
     const lmsAvatar = byId || byName
-    if (lmsAvatar) {
-      map[id] = { ...rec, avatarUrl: lmsAvatar }
+    map[id] = {
+      ...rec,
+      userName: updatedName,
+      userRole: updatedRole,
+      ...(lmsAvatar ? { avatarUrl: lmsAvatar } : {}),
     }
   }
+  writeRecordsMap(map)
 
   const normalized = Object.values(map)
     .map(normalizeStreakStatus)
@@ -293,6 +381,14 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
     .sort((a, b) => {
       if (b.streak !== a.streak) return b.streak - a.streak
       if (a.solvedToday !== b.solvedToday) return a.solvedToday ? -1 : 1
+      if (a.lastSolvedDate !== b.lastSolvedDate) {
+        return (b.lastSolvedDate || '').localeCompare(a.lastSolvedDate || '')
+      }
+      const timeA = a.solvedAt ? Date.parse(a.solvedAt) : Number.MAX_SAFE_INTEGER
+      const timeB = b.solvedAt ? Date.parse(b.solvedAt) : Number.MAX_SAFE_INTEGER
+      if (!Number.isNaN(timeA) && !Number.isNaN(timeB) && timeA !== timeB) {
+        return timeA - timeB
+      }
       return a.userName.localeCompare(b.userName)
     })
     .slice(0, 10)
@@ -305,6 +401,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
     streak: entry.streak,
     solvedToday: entry.solvedToday,
     lastSolvedDate: entry.lastSolvedDate,
+    solvedAt: entry.solvedAt,
     avatarUrl: entry.avatarUrl,
   }))
 }

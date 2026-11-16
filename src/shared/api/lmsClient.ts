@@ -92,6 +92,7 @@ const TOKENS_STORAGE_KEY = 'auth_tokens'
 const LMS_ORIGIN_KEY = 'lms_origin'
 const LMS_API_URL_KEY = 'lms_api_url'
 const EXPLORER_USER_ID_KEY = 'xsolla_explorer_student_id'
+const LMS_RESET_GEN_PREFIX = 'xsolla_lms_reset_gen_'
 
 const KNOWN_ROLES: readonly LmsRole[] = ['student', 'mentor', 'lecturer', 'admin']
 
@@ -144,8 +145,29 @@ export function syncExplorerUuidWithLmsUser(user: LmsUser | null): void {
   try {
     if (!user) return
     const num = Math.max(1, Math.abs(Number(user.id) || 1))
+    const gen = Math.max(
+      0,
+      Number(localStorage.getItem(`${LMS_RESET_GEN_PREFIX}${num}`) || 0),
+    )
+    const genHex = (gen % 0x10000).toString(16).padStart(4, '0')
     const hex = num.toString(16).padStart(12, '0').slice(-12)
-    localStorage.setItem(EXPLORER_USER_ID_KEY, `00000000-0000-0000-0000-${hex}`)
+    localStorage.setItem(EXPLORER_USER_ID_KEY, `00000000-0000-0000-${genHex}-${hex}`)
+  } catch {
+    return
+  }
+}
+
+export function bumpLmsExplorerSessionReset(user: LmsUser | null): void {
+  try {
+    if (user) {
+      const num = Math.max(1, Math.abs(Number(user.id) || 1))
+      const key = `${LMS_RESET_GEN_PREFIX}${num}`
+      const nextGen = (Math.max(0, Number(localStorage.getItem(key) || 0)) + 1) % 0x10000
+      localStorage.setItem(key, String(nextGen))
+      syncExplorerUuidWithLmsUser(user)
+    } else {
+      localStorage.removeItem(EXPLORER_USER_ID_KEY)
+    }
   } catch {
     return
   }
@@ -1406,16 +1428,25 @@ export async function fetchLmsMyProfileAvatar(): Promise<string | null> {
   }
 
   let foundAvatar: string | null = user.avatarUrl ?? null
+  let foundName: string | null = user.name ?? null
   try {
-    const profile = await lmsAuthedRequest<{ avatar_url?: string | null }>('/users/me/profile')
+    const profile = await lmsAuthedRequest<{ name?: string; avatar_url?: string | null }>(
+      '/users/me/profile',
+    )
     if (profile && typeof profile.avatar_url === 'string' && profile.avatar_url.trim()) {
       foundAvatar = profile.avatar_url.trim()
     }
+    if (profile && typeof profile.name === 'string' && profile.name.trim()) {
+      foundName = profile.name.trim()
+    }
   } catch {
     try {
-      const me = await lmsAuthedRequest<{ avatar_url?: string | null }>('/users/me')
+      const me = await lmsAuthedRequest<{ name?: string; avatar_url?: string | null }>('/users/me')
       if (me && typeof me.avatar_url === 'string' && me.avatar_url.trim()) {
         foundAvatar = me.avatar_url.trim()
+      }
+      if (me && typeof me.name === 'string' && me.name.trim()) {
+        foundName = me.name.trim()
       }
     } catch {
       foundAvatar = user.avatarUrl ?? null
@@ -1423,15 +1454,46 @@ export async function fetchLmsMyProfileAvatar(): Promise<string | null> {
   }
 
   const resolved = resolveLmsAvatarUrl(foundAvatar)
-  if (resolved && resolved !== user.avatarUrl) {
+  if ((resolved && resolved !== user.avatarUrl) || (foundName && foundName !== user.name)) {
     try {
-      const updatedUser: LmsUser = { ...user, avatarUrl: resolved }
+      const updatedUser: LmsUser = {
+        ...user,
+        name: foundName || user.name,
+        avatarUrl: resolved ?? user.avatarUrl,
+      }
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser))
     } catch (err) {
       void err
     }
   }
   return resolved
+}
+
+export async function fetchLmsDirectoryNames(): Promise<Record<string, string>> {
+  const names: Record<string, string> = {}
+  const user = getLmsUser()
+  if (user?.name) {
+    names[`lms-${user.id}`] = user.name.trim()
+  }
+  if (!user || !isLiveLmsBackend()) {
+    return names
+  }
+  try {
+    const users =
+      (await lmsAuthedRequest<{ id: number | string; name?: string }[] | null>('/users')) ?? []
+    for (const u of users) {
+      if (u.name && u.name.trim()) {
+        names[`lms-${u.id}`] = u.name.trim()
+      }
+    }
+  } catch (err) {
+    void err
+  }
+  const refreshedUser = getLmsUser()
+  if (refreshedUser?.name) {
+    names[`lms-${refreshedUser.id}`] = refreshedUser.name.trim()
+  }
+  return names
 }
 
 export async function fetchLmsDirectoryAvatars(): Promise<Record<string, string>> {

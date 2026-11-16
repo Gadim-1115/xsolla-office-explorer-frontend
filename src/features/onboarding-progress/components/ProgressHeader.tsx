@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Flame, LogIn, LogOut, RotateCcw, UserCheck } from 'lucide-react'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
+import { httpRequest } from '../../../shared/api/httpClient'
 import {
+  bumpLmsExplorerSessionReset,
   captureLmsSessionFromUrl,
   clearLmsSession,
   getLmsRoleLabel,
@@ -84,9 +86,11 @@ export function ProgressHeader() {
     return () => observer.disconnect()
   }, [])
 
-  const handleResetDemoUser = () => {
-    localStorage.removeItem('xsolla_explorer_student_id')
-    notify('success', 'New Student Session Started', 'All zones reset to initial state.')
+  const handleResetDemoUser = async () => {
+    await httpRequest('/explorer/reset', { method: 'POST' }).catch(() => undefined)
+    bumpLmsExplorerSessionReset(getLmsUser())
+    closeRoomModal()
+    notify('success', 'Session Reset', 'All zones and progress reset to initial state.')
     void refreshMap()
   }
 
