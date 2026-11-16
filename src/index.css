@@ -80,6 +80,25 @@ code, pre, .font-mono {
   animation: roomDiveIn 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+@keyframes roomTitleRoll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-room-title-roll {
+  display: inline-flex;
+  width: max-content;
+  animation: roomTitleRoll 9s linear infinite;
+}
+
+.animate-room-title-roll:hover {
+  animation-play-state: paused;
+}
+
 /* 100% completion celebration: each piece gets its own drift, spin, duration and delay */
 @keyframes confettiFall {
   0% {

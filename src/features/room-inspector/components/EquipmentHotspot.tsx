@@ -75,7 +75,8 @@ export function EquipmentHotspot({
     hotspot.category === 'WHITEBOARD' ||
     hotspot.category === 'GRADES' ||
     hotspot.category === 'DAILY_BUG' ||
-    hotspot.category === 'LEADERBOARD'
+    hotspot.category === 'LEADERBOARD' ||
+    hotspot.category === 'CABINE'
 
   const renderIcon = () => {
     switch (hotspot.category) {
@@ -140,6 +141,7 @@ export function EquipmentHotspot({
     if (hotspot.category === 'GRADES') return 'Student Grades'
     if (hotspot.category === 'DAILY_BUG') return 'Workstation Monitor'
     if (hotspot.category === 'LEADERBOARD') return 'Top 10 Leaderboard'
+    if (hotspot.category === 'CABINE') return 'Interview Flashcards'
     return 'LMS Tasks'
   }
 
@@ -202,7 +204,9 @@ export function EquipmentHotspot({
                           ? 'DAILY CHALLENGE'
                           : hotspot.category === 'LEADERBOARD'
                             ? 'TOP 10 STREAK'
-                            : hotspot.category.replace('_', ' ')}
+                            : hotspot.category === 'CABINE'
+                              ? '1-MIN INTERVIEW'
+                              : hotspot.category.replace('_', ' ')}
               </span>
             </div>
             <p className="text-xs text-[#9DB0B4] whitespace-pre-line leading-relaxed">

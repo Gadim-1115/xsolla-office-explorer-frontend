@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import {
   ArrowLeft,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Compass,
-  Crosshair,
   Images,
   Info,
   Maximize2,
@@ -20,7 +21,9 @@ import { Modal } from '../../../shared/ui/Modal'
 import { useExplorer } from '../../../app/providers/ExplorerProvider'
 import type { HotspotDTO } from '../../../shared/types/api.types'
 import {
+  hasRoomPanorama,
   resolveRoomScenes,
+  xPercentToYaw,
   type StreetViewLink,
 } from '../../../shared/constants/roomScenes'
 import {
@@ -35,6 +38,7 @@ import { StreetViewArrow } from './StreetViewArrow'
 import { LmsSurfaceModal } from './LmsSurfaceModal'
 import { DailyBugMonitorModal } from '../../daily-bug-hunt/components/DailyBugMonitorModal'
 import { StreakLeaderboardModal } from '../../daily-bug-hunt/components/StreakLeaderboardModal'
+import { InterviewFlashcardsModal } from './InterviewFlashcardsModal'
 import { useEasterEgg } from '../hooks/useEasterEgg'
 
 function getRoomAtmosphereGradient(zoneId: string): string {
@@ -64,6 +68,7 @@ export function RoomModal() {
     closeRoomModal,
     activeMapHotspot,
     closeMapHotspot,
+    notify,
   } = useExplorer()
   const { claimEgg, claimingId } = useEasterEgg()
 
@@ -73,6 +78,7 @@ export function RoomModal() {
   const [isDailyBugOpen, setIsDailyBugOpen] = useState<boolean>(false)
   const [isZoomingMonitor, setIsZoomingMonitor] = useState<boolean>(false)
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState<boolean>(false)
+  const [isFlashcardsOpen, setIsFlashcardsOpen] = useState<boolean>(false)
   const [failedUrls, setFailedUrls] = useState<Record<string, boolean>>({})
   const [isWalking, setIsWalking] = useState<boolean>(false)
 
@@ -81,13 +87,11 @@ export function RoomModal() {
   const [fovZoom, setFovZoom] = useState<number>(1)
   const [autoRotate, setAutoRotate] = useState<boolean>(false)
   const [isDragging, setIsDragging] = useState<boolean>(false)
-  const [calibrateMode, setCalibrateMode] = useState<boolean>(false)
   const [immersive, setImmersive] = useState<boolean>(false)
-  const [cursorCoords, setCursorCoords] = useState<{ x: number; y: number } | null>(
-    null,
-  )
+  const [isFooterOpen, setIsFooterOpen] = useState<boolean>(true)
 
   const stageRef = useRef<HTMLDivElement | null>(null)
+  const pendingYawRef = useRef<number | null>(null)
   const dragStart = useRef<{ x: number; y: number; yaw: number; pitch: number }>({
     x: 0,
     y: 0,
@@ -134,15 +138,24 @@ export function RoomModal() {
       setActiveSceneIndex(0)
     }
     setSelectedHotspot(null)
-    setYawDeg(0)
+    if (pendingYawRef.current !== null) {
+      setYawDeg(pendingYawRef.current)
+      pendingYawRef.current = null
+    } else {
+      setYawDeg(0)
+    }
     setPitchDeg(0)
     setFovZoom(1)
     setAutoRotate(false)
-  }, [zone, selectedRoomZoneId, selectedSceneId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoomZoneId, selectedSceneId])
 
   useEffect(() => {
     setSelectedHotspot(null)
-    setYawDeg(0)
+    if (pendingYawRef.current !== null) {
+      setYawDeg(pendingYawRef.current)
+      pendingYawRef.current = null
+    }
     setPitchDeg(0)
     setFovZoom(1)
   }, [activeSceneIndex])
@@ -244,6 +257,10 @@ export function RoomModal() {
       setIsLeaderboardOpen(true)
       return
     }
+    if (hotspot.category === 'CABINE') {
+      setIsFlashcardsOpen(true)
+      return
+    }
     const currentUser = getLmsUser()
     if (!currentUser) {
       redirectToLmsLogin(false)
@@ -263,9 +280,53 @@ export function RoomModal() {
       openQuestModal(link.targetZoneId)
       return
     }
+    if (!hasRoomPanorama(link.targetZoneId)) {
+      notify(
+        'info',
+        `${targetZone?.name || link.label} — Coming Soon`,
+        '360° panoramic view for this room will be available soon.',
+      )
+      return
+    }
+
+    let nextYaw = yawDeg
+    if (typeof link.targetYaw === 'number') {
+      nextYaw = link.targetYaw
+    } else {
+      const targetScenes = resolveRoomScenes(
+        link.targetZoneId,
+        targetZone?.media_url,
+        targetZone?.hotspots,
+      )
+      const targetScene = link.targetSceneId
+        ? targetScenes.find((s) => s.id === link.targetSceneId) ?? targetScenes[0]
+        : targetScenes[0]
+      const targetLinks = targetScene?.links ?? []
+      const backLink =
+        targetLinks.find(
+          (l) => l.targetZoneId === zone.id && l.targetSceneId === currentScene.id,
+        ) ?? targetLinks.find((l) => l.targetZoneId === zone.id)
+
+      if (backLink) {
+        const oppositeX = (backLink.x_percent + 50) % 100
+        let bestForwardX = oppositeX
+        let bestDist = 26
+        for (const candidate of targetLinks) {
+          if (candidate.id === backLink.id || candidate.direction === 'door') continue
+          const rawDiff = Math.abs(candidate.x_percent - oppositeX) % 100
+          const dist = rawDiff > 50 ? 100 - rawDiff : rawDiff
+          if (dist < bestDist) {
+            bestDist = dist
+            bestForwardX = candidate.x_percent
+          }
+        }
+        nextYaw = xPercentToYaw(bestForwardX)
+      }
+    }
 
     setIsWalking(true)
     window.setTimeout(() => {
+      pendingYawRef.current = nextYaw
       if (link.targetZoneId === zone.id && link.targetSceneId) {
         const nextIdx = scenes.findIndex((s) => s.id === link.targetSceneId)
         if (nextIdx >= 0) {
@@ -274,9 +335,7 @@ export function RoomModal() {
       } else {
         openRoomModal(link.targetZoneId, link.targetSceneId)
       }
-      if (typeof link.targetYaw === 'number') {
-        setYawDeg(link.targetYaw)
-      }
+      setYawDeg(nextYaw)
       setIsWalking(false)
     }, 300)
   }
@@ -301,17 +360,6 @@ export function RoomModal() {
     const nextPitch = Math.max(-20, Math.min(20, dragStart.current.pitch + dy * 0.08))
     setYawDeg(nextYaw)
     setPitchDeg(nextPitch)
-  }
-
-  const handleTileMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!calibrateMode) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const xPct = ((e.clientX - rect.left) / rect.width) * 100
-    const yPct = ((e.clientY - rect.top) / rect.height) * 100
-    setCursorCoords({
-      x: Math.max(0, Math.min(100, Number(xPct.toFixed(1)))),
-      y: Math.max(0, Math.min(100, Number(yPct.toFixed(1)))),
-    })
   }
 
   const handlePointerUp = () => {
@@ -365,17 +413,15 @@ export function RoomModal() {
             <span className="hidden sm:inline">Back to 31st-Floor Map</span>
           </button>
 
-          <div className="min-w-0 flex-1 text-left lg:flex-none lg:rounded-lg lg:border lg:border-[#2F4045] lg:bg-[#233134]/95 lg:px-4 lg:py-2 lg:shadow-md lg:backdrop-blur-md">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-[#80EAFF]" />
-              <h2 className="truncate text-sm font-bold text-white">
-                {/* phones drop the bracketed part: "Open Space 1 (Xsolla School Students)" -> "Open Space 1" */}
-                <span className="sm:hidden">{zone.name.replace(/\s*\([^)]*\)\s*$/, '')}</span>
-                <span className="hidden sm:inline">{zone.name}</span>
-              </h2>
-              <span className="hidden shrink-0 rounded-[4px] bg-[#153640] border border-[#80EAFF]/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#80EAFF] sm:inline">
-                {is360Mode ? '360° Panorama' : 'Room Photo'}
-              </span>
+          <div className="flex w-[140px] sm:w-[175px] shrink-0 items-center gap-2 overflow-hidden rounded-lg border border-[#2F4045] bg-[#233134]/95 px-2.5 py-2 shadow-md backdrop-blur-md">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-[#80EAFF]" />
+            <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+              <div className="animate-room-title-roll text-xs font-bold text-white">
+                <span className="pr-6">{zone.name}</span>
+                <span className="pr-6" aria-hidden="true">
+                  {zone.name}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -480,23 +526,6 @@ export function RoomModal() {
           >
             <Maximize2 className="h-3.5 w-3.5" />
           </button>
-
-          <button
-            type="button"
-            onClick={() => setCalibrateMode((v) => !v)}
-            // pin-placement helper for the team: it reads the mouse position, so desktop only
-            className={`hidden shrink-0 items-center gap-1 whitespace-nowrap rounded-[6px] px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer md:flex ${
-              calibrateMode
-                ? 'bg-[#80EAFF] text-[#0D1A1D]'
-                : 'bg-[#2F4045] text-white hover:bg-[#80EAFF] hover:text-[#0D1A1D]'
-            }`}
-            title="Show cursor X/Y % coordinates for placing new equipment pins"
-          >
-            <Crosshair className="h-3.5 w-3.5" />
-            {calibrateMode && cursorCoords
-              ? `X:${cursorCoords.x}% Y:${cursorCoords.y}%`
-              : 'Pin Coords'}
-          </button>
         </div>
       </div>
 
@@ -556,7 +585,6 @@ export function RoomModal() {
                 {[0, 1].map((tileIdx) => (
                   <div
                     key={tileIdx}
-                    onMouseMove={handleTileMouseMove}
                     style={{
                       backgroundImage: `url("${currentUrl}")`,
                       backgroundRepeat: 'no-repeat',
@@ -601,7 +629,6 @@ export function RoomModal() {
             </div>
           ) : (
             <div
-              onMouseMove={handleTileMouseMove}
               style={{
                 transform: `scale(${fovZoom})`,
                 backgroundImage: `url("${currentUrl}")`,
@@ -703,13 +730,28 @@ export function RoomModal() {
         )}
       </div>
 
-      <div className={`z-30 flex flex-wrap items-center justify-between gap-2 border-t border-[#2F4045] bg-[#233134] px-3 py-2 sm:gap-4 sm:px-6 sm:py-3 ${immersive ? 'hidden' : ''}`}>
+      {!immersive && !isFooterOpen && (
+        <button
+          type="button"
+          onClick={() => setIsFooterOpen(true)}
+          title="Open room info panel"
+          aria-label="Open room info panel"
+          className="absolute bottom-3 right-3 z-30 flex h-7 w-7 items-center justify-center rounded-[6px] border border-[#2F4045] bg-[#233134]/95 text-[#80EAFF] shadow-md backdrop-blur-md hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
+        >
+          <ChevronUp className="h-3.5 w-3.5" />
+        </button>
+      )}
+
+      <div
+        className={`relative z-30 flex flex-wrap items-center justify-between gap-2 border-t border-[#2F4045] bg-[#233134] py-2 pl-3 pr-11 sm:gap-4 sm:py-3 sm:pl-6 sm:pr-14 ${
+          immersive || !isFooterOpen ? 'hidden' : ''
+        }`}
+      >
         <div className="flex items-center gap-3 text-left">
           <Info className="hidden h-4 w-4 shrink-0 text-[#80EAFF] sm:block" />
           <p className="line-clamp-2 text-xs text-[#9DB0B4] sm:line-clamp-none">
             <span className="font-bold text-white">{zone.name}:</span>{' '}
             {zone.description}
-            {/* the hint mentions hovering, which phones cannot do */}
             <span className="hidden md:inline">
               {' · '}
               <span className="font-semibold text-[#80EAFF]">
@@ -745,6 +787,16 @@ export function RoomModal() {
             Spot hidden Xsolla logos in the 360° view
           </span>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setIsFooterOpen(false)}
+          title="Collapse room info panel"
+          aria-label="Collapse room info panel"
+          className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 shrink-0 items-center justify-center rounded-[5px] border border-[#2F4045] bg-[#141E20] text-[#9DB0B4] hover:border-[#80EAFF] hover:text-[#80EAFF] transition cursor-pointer sm:right-4"
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       <LmsSurfaceModal
@@ -764,6 +816,11 @@ export function RoomModal() {
       <StreakLeaderboardModal
         isOpen={isLeaderboardOpen}
         onClose={() => setIsLeaderboardOpen(false)}
+      />
+
+      <InterviewFlashcardsModal
+        isOpen={isFlashcardsOpen}
+        onClose={() => setIsFlashcardsOpen(false)}
       />
     </div>
   )

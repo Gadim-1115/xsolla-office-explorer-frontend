@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { ChevronUp, DoorOpen, Lock } from 'lucide-react'
-import type { StreetViewLink } from '../../../shared/constants/roomScenes'
+import { ChevronUp, Clock, DoorOpen, Lock } from 'lucide-react'
+import {
+  hasRoomPanorama,
+  type StreetViewLink,
+} from '../../../shared/constants/roomScenes'
 
 interface StreetViewArrowProps {
   link: StreetViewLink
@@ -63,6 +66,7 @@ export function StreetViewArrow({
   }
 
   if (isLocked || link.direction === 'door') {
+    const isComingSoon = !hasRoomPanorama(link.targetZoneId)
     return (
       <div
         style={{
@@ -74,9 +78,12 @@ export function StreetViewArrow({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation()
+          if (isComingSoon && !isLocked) return
           onNavigate(link)
         }}
-        className="absolute -translate-x-1/2 -translate-y-1/2 z-30 cursor-pointer select-none"
+        className={`absolute -translate-x-1/2 -translate-y-1/2 z-30 select-none ${
+          isComingSoon && !isLocked ? 'cursor-default' : 'cursor-pointer'
+        }`}
       >
         <div
           className={`relative flex items-center gap-2.5 rounded-lg border text-xs font-bold ${compact ? 'h-11 w-11 justify-center !rounded-full' : 'px-4 py-2.5'} shadow-[0_12px_32px_rgba(0,0,0,0.28)] overflow-hidden transition-all duration-200 ${
@@ -84,26 +91,42 @@ export function StreetViewArrow({
               ? isHovered
                 ? 'border-rose-400 bg-[#3A2429] text-rose-100 scale-105'
                 : 'border-rose-400/50 bg-[#233134]/95 text-white hover:scale-105'
-              : isHovered
-                ? 'border-[#80EAFF] bg-[#153640] text-white scale-105'
-                : 'border-[#2F4045] bg-[#233134]/95 text-white hover:scale-105'
+              : isComingSoon
+                ? 'border-amber-400/40 bg-[#233134]/95 text-white'
+                : isHovered
+                  ? 'border-[#80EAFF] bg-[#153640] text-white scale-105'
+                  : 'border-[#2F4045] bg-[#233134]/95 text-white hover:scale-105'
           }`}
         >
           <div
             className={`absolute top-0 left-0 right-0 h-[3px] ${
-              isLocked ? 'bg-rose-500' : 'bg-[#80EAFF]'
+              isLocked
+                ? 'bg-rose-500'
+                : isComingSoon
+                  ? 'bg-amber-400/80'
+                  : 'bg-[#80EAFF]'
             }`}
           />
           {isLocked ? (
             <Lock className="h-4 w-4 shrink-0 text-rose-400" />
+          ) : isComingSoon ? (
+            <Clock className="h-4 w-4 shrink-0 text-amber-400" />
           ) : (
             <DoorOpen className="h-4 w-4 shrink-0 text-[#80EAFF]" />
           )}
           {!compact && (
           <div className="flex flex-col text-left leading-tight">
             <span>{link.label}</span>
-            <span className="text-[10px] font-medium text-[#9DB0B4]">
-              {isLocked ? 'Locked · Click to solve Go Quest' : 'Click to enter room'}
+            <span
+              className={`text-[10px] font-medium ${
+                isComingSoon && !isLocked ? 'text-amber-300' : 'text-[#9DB0B4]'
+              }`}
+            >
+              {isLocked
+                ? 'Locked · Click to solve Go Quest'
+                : isComingSoon
+                  ? 'Coming Soon'
+                  : 'Click to enter room'}
             </span>
           </div>
           )}

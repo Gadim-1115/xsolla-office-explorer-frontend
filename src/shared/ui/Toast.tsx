@@ -1,8 +1,8 @@
-import { CheckCircle2, AlertTriangle, Sparkles, X } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Clock, Sparkles, X } from 'lucide-react'
 
 export interface ToastMessage {
   id: string
-  type: 'success' | 'error' | 'achievement'
+  type: 'success' | 'error' | 'achievement' | 'info'
   title: string
   description?: string
 }
@@ -20,6 +20,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
       {toasts.map((toast) => {
         const isAchievement = toast.type === 'achievement'
         const isError = toast.type === 'error'
+        const isInfo = toast.type === 'info'
 
         return (
           <div
@@ -28,7 +29,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
           >
             <div
               className={`absolute top-0 left-0 right-0 h-[3px] ${
-                isError ? 'bg-[#3A2429]0' : 'bg-[#80EAFF]'
+                isError ? 'bg-rose-500' : isInfo ? 'bg-amber-400' : 'bg-[#80EAFF]'
               }`}
             />
             <div className="mt-0.5 shrink-0">
@@ -36,6 +37,8 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
                 <Sparkles className="h-5 w-5 text-[#80EAFF]" />
               ) : isError ? (
                 <AlertTriangle className="h-5 w-5 text-rose-500" />
+              ) : isInfo ? (
+                <Clock className="h-5 w-5 text-amber-400" />
               ) : (
                 <CheckCircle2 className="h-5 w-5 text-[#80EAFF]" />
               )}

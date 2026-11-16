@@ -1,16 +1,33 @@
 import type { APIEnvelope } from '../types/api.types'
+import {
+  captureLmsSessionFromUrl,
+  getLmsUser,
+  syncExplorerUuidWithLmsUser,
+} from './lmsClient'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 const STORAGE_USER_ID_KEY = 'xsolla_explorer_student_id'
+const LMS_UUID_PREFIX = '00000000-0000-0000-0000-'
 
 function getOrCreateStudentId(): string {
+  captureLmsSessionFromUrl()
+  const lmsUser = getLmsUser()
+  if (lmsUser) {
+    syncExplorerUuidWithLmsUser(lmsUser)
+    const synced = localStorage.getItem(STORAGE_USER_ID_KEY)
+    if (synced) return synced
+  }
+
   const existing = localStorage.getItem(STORAGE_USER_ID_KEY)
-  if (existing) {
+  if (existing && !existing.startsWith(LMS_UUID_PREFIX)) {
     return existing
   }
+
   const generated = crypto.randomUUID
     ? crypto.randomUUID()
-    : '00000000-0000-0000-0000-000000000001'
+    : `10000000-0000-4000-8000-${Math.floor(Math.random() * 0xffffffffffff)
+        .toString(16)
+        .padStart(12, '0')}`
   localStorage.setItem(STORAGE_USER_ID_KEY, generated)
   return generated
 }

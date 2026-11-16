@@ -169,6 +169,10 @@ export function StreakLeaderboardModal({
             <div className="py-12 text-center text-xs text-[#9DB0B4]">
               Loading Top 10 Streak Champions...
             </div>
+          ) : entries.length === 0 ? (
+            <div className="py-8 text-center text-xs text-[#9DB0B4]">
+              No active streaks recorded yet. Solve today’s Daily Bug Hunt in Open Space 2 to claim 1st place!
+            </div>
           ) : (
             <div className="mt-3 flex items-start justify-center gap-3 sm:gap-5">
               {renderPodiumSide(second, '2 nd', 'border-[#80EAFF]')}
@@ -247,58 +251,64 @@ export function StreakLeaderboardModal({
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-[#2F4045]/70 rounded-b-lg border-x border-b border-[#2F4045]">
-            {rest.map((item, idx) => {
-              const isMe = currentUserId !== null && item.userId === currentUserId
-              return (
-                <div
-                  key={item.userId}
-                  className={`grid grid-cols-12 items-center px-4 py-2.5 transition ${
-                    isMe
-                      ? 'bg-[#153640] text-white'
-                      : idx % 2 === 0
-                        ? 'bg-[#233134] text-white'
-                        : 'bg-[#1E2B2E] text-white'
-                  }`}
-                >
-                  <div className="col-span-2 text-left text-base sm:text-lg font-black text-[#80EAFF]">
-                    {item.rank}
-                  </div>
+            {rest.length === 0 ? (
+              <div className="bg-[#233134] px-4 py-6 text-center text-xs text-[#9DB0B4]">
+                Ranks 4–10 will appear here as more players build daily streaks.
+              </div>
+            ) : (
+              rest.map((item, idx) => {
+                const isMe = currentUserId !== null && item.userId === currentUserId
+                return (
+                  <div
+                    key={item.userId}
+                    className={`grid grid-cols-12 items-center px-4 py-2.5 transition ${
+                      isMe
+                        ? 'bg-[#153640] text-white'
+                        : idx % 2 === 0
+                          ? 'bg-[#233134] text-white'
+                          : 'bg-[#1E2B2E] text-white'
+                    }`}
+                  >
+                    <div className="col-span-2 text-left text-base sm:text-lg font-black text-[#80EAFF]">
+                      {item.rank}
+                    </div>
 
-                  <div className="col-span-6 flex min-w-0 items-center gap-2.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#80EAFF]/50 bg-[#153640]">
-                      <LeaderboardAvatar
-                        entry={item}
-                        sizeClass="h-full w-full"
-                        iconClass="h-4 w-4 text-[#80EAFF]"
+                    <div className="col-span-6 flex min-w-0 items-center gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#80EAFF]/50 bg-[#153640]">
+                        <LeaderboardAvatar
+                          entry={item}
+                          sizeClass="h-full w-full"
+                          iconClass="h-4 w-4 text-[#80EAFF]"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs sm:text-sm font-bold text-white">
+                          {item.userName}
+                        </p>
+                        {isMe && (
+                          <span className="inline-block rounded bg-[#80EAFF] px-1.5 py-0.2 text-[9px] font-black uppercase text-[#0D1A1D]">
+                            You
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="col-span-4 flex items-center justify-end gap-1.5 text-right">
+                      <Flame
+                        className={`h-4 w-4 shrink-0 ${
+                          item.solvedToday
+                            ? 'fill-amber-400 text-orange-400'
+                            : 'text-[#62777C] opacity-65'
+                        }`}
                       />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs sm:text-sm font-bold text-white">
-                        {item.userName}
-                      </p>
-                      {isMe && (
-                        <span className="inline-block rounded bg-[#80EAFF] px-1.5 py-0.2 text-[9px] font-black uppercase text-[#0D1A1D]">
-                          You
-                        </span>
-                      )}
+                      <span className="text-base sm:text-lg font-black text-white">
+                        {item.streak}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="col-span-4 flex items-center justify-end gap-1.5 text-right">
-                    <Flame
-                      className={`h-4 w-4 shrink-0 ${
-                        item.solvedToday
-                          ? 'fill-amber-400 text-orange-400'
-                          : 'text-[#62777C] opacity-65'
-                      }`}
-                    />
-                    <span className="text-base sm:text-lg font-black text-white">
-                      {item.streak}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </div>
         </div>
       </div>

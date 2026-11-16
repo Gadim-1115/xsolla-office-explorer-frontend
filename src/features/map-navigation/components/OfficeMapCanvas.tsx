@@ -11,6 +11,7 @@ import {
   MAP_ZONE_IDS,
   ZONE_LABEL_POSITIONS,
 } from '../../../shared/constants/mapIds'
+import { hasRoomPanorama } from '../../../shared/constants/roomScenes'
 import type { HotspotDTO } from '../../../shared/types/api.types'
 
 const MAP_WIDTH = 'min(141vw, calc((100dvh - var(--explorer-header-h, 65px)) * 2.64))'
@@ -37,6 +38,7 @@ export function OfficeMapCanvas() {
     selectedRoomZoneId,
     isLoading,
     error,
+    notify,
   } = useExplorer()
   const { hoveredZoneId, setHoveredZoneId } = useMapInteraction()
 
@@ -63,6 +65,15 @@ export function OfficeMapCanvas() {
 
     if (zone.status === 'LOCKED') {
       openQuestModal(zoneId)
+      return
+    }
+
+    if (!hasRoomPanorama(zoneId)) {
+      notify(
+        'info',
+        `${zone.name} — Coming Soon`,
+        '360° panoramic view for this room will be available soon.',
+      )
       return
     }
 
@@ -167,6 +178,7 @@ export function OfficeMapCanvas() {
                   )}
                   <span className="text-xs font-bold text-white">
                     {hoveredZone.name}
+                    {!hasRoomPanorama(hoveredZone.id) ? ' · Coming Soon' : ''}
                   </span>
                 </div>
               )}

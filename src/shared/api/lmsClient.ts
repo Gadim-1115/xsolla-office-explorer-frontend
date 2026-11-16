@@ -232,6 +232,7 @@ export function clearLmsSession(): void {
   try {
     localStorage.removeItem(USER_STORAGE_KEY)
     localStorage.removeItem(TOKENS_STORAGE_KEY)
+    localStorage.removeItem(EXPLORER_USER_ID_KEY)
   } catch {
     return
   }
@@ -880,7 +881,21 @@ export async function fetchLmsGrades(): Promise<LmsGradesData> {
     let teamName = 'My Team'
     let members: { id: number; name: string; email: string }[] = []
 
-    if (canLmsMentor(user)) {
+    if (isLmsAdmin(user)) {
+      try {
+        const users =
+          (await lmsAuthedRequest<
+            { id: number | string; name: string; email: string; role?: string; roles?: string[] }[] | null
+          >('/users')) ?? []
+        teamName = 'All Students'
+        members = users
+          .filter((u) => normalizeRoles(u.roles ?? u.role).includes('student'))
+          .map((u) => ({ id: Number(u.id), name: u.name, email: u.email }))
+      } catch {
+        teamName = 'Cohort Students'
+        members = []
+      }
+    } else if (canLmsMentor(user)) {
       try {
         const team = await lmsAuthedRequest<ApiMentorTeam>('/mentors/me/team')
         teamName = team.name || 'Mentor Team'
@@ -891,20 +906,6 @@ export async function fetchLmsGrades(): Promise<LmsGradesData> {
         }))
       } catch {
         teamName = 'No Team Assigned'
-        members = []
-      }
-    } else if (isLmsAdmin(user)) {
-      try {
-        const users =
-          (await lmsAuthedRequest<{ id: number | string; name: string; email: string; roles?: string[] }[] | null>(
-            '/users',
-          )) ?? []
-        teamName = 'All Students'
-        members = users
-          .filter((u) => !u.roles || u.roles.includes('student') || u.roles.length === 0)
-          .map((u) => ({ id: Number(u.id), name: u.name, email: u.email }))
-      } catch {
-        teamName = 'Cohort Students'
         members = []
       }
     }
@@ -934,8 +935,8 @@ export async function fetchLmsGrades(): Promise<LmsGradesData> {
 
     const combinedCounts = { green: 0, yellow: 0, red: 0, total: 0 }
     for (const m of teamMembers) {
-      if (m.current) {
-        combinedCounts[m.current] += 1
+      for (const w of m.weeks) {
+        combinedCounts[w.effective] += 1
         combinedCounts.total += 1
       }
     }
@@ -1008,11 +1009,16 @@ export async function fetchLmsGrades(): Promise<LmsGradesData> {
       ['green', 'yellow', 'green', 'yellow'],
     ]
 
-    const isTeam3Mentor = user.id === 900 || isLmsAdmin(user)
-    const roster = isTeam3Mentor ? team3Members : team4Members
-    const teamName = isTeam3Mentor ? 'Team 3' : 'Team 4'
+    const isAdminUser = isLmsAdmin(user)
+    const isTeam3Mentor = user.id === 900
+    const roster = isAdminUser
+      ? [...team3Members, ...team4Members]
+      : isTeam3Mentor
+        ? team3Members
+        : team4Members
+    const teamName = isAdminUser ? 'All Students' : isTeam3Mentor ? 'Team 3' : 'Team 4'
 
-    const teamMembers: LmsTeamMemberStanding[] = roster.map((member, idx) => {
+    const teamMembers: LmsTeamMemberStanding[] = roster.map((member) => {
       let rawMemberWeeks: { week: number; level: LmsStandingLevel; assessedAt: string; note?: string }[] = []
       if (storedStandings) {
         rawMemberWeeks = Object.values(storedStandings).filter((s) => s.studentId === member.id)
@@ -1021,7 +1027,11 @@ export async function fetchLmsGrades(): Promise<LmsGradesData> {
         if (member.id === 1) {
           rawMemberWeeks = defaultSamWeeks
         } else {
-          rawMemberWeeks = othersPattern[idx % othersPattern.length].map((lvl, wi) => ({
+          const teamIdx = team3Members.some((m) => m.id === member.id)
+            ? team3Members.filter((m) => m.id !== 1).findIndex((m) => m.id === member.id)
+            : team4Members.findIndex((m) => m.id === member.id)
+          const patternIdx = Math.max(0, teamIdx) % othersPattern.length
+          rawMemberWeeks = othersPattern[patternIdx].map((lvl, wi) => ({
             week: wi + 1,
             level: lvl,
             assessedAt: dayAt(now, (wi - 5) * 7),
@@ -1040,15 +1050,24 @@ export async function fetchLmsGrades(): Promise<LmsGradesData> {
 
     const combinedCounts = { green: 0, yellow: 0, red: 0, total: 0 }
     for (const m of teamMembers) {
-      if (m.current) {
-        combinedCounts[m.current] += 1
+      for (const w of m.weeks) {
+        combinedCounts[w.effective] += 1
         combinedCounts.total += 1
       }
     }
 
+    const overallCurrent: LmsStandingLevel | null =
+      combinedCounts.red > 0
+        ? 'red'
+        : combinedCounts.yellow > 0
+          ? 'yellow'
+          : combinedCounts.green > 0
+            ? 'green'
+            : null
+
     return {
       mode: 'staff',
-      current: 'green',
+      current: overallCurrent,
       counts: combinedCounts,
       alert: null,
       totalWeeks: 12,
@@ -1211,17 +1230,47 @@ export async function fetchLiveStudentReminders(): Promise<LmsStudentRemindersDa
     return null
   }
 
+  const now = new Date()
+  const sevenDaysAhead = new Date(now.getTime() + 7 * 86_400_000)
+
   if (!isLiveLmsBackend()) {
+    const fallbackTasks = buildFallbackTasks(user, now)
+    const pendingTasks = fallbackTasks.filter(
+      (t) => t.status === 'open' || t.status === 'overdue',
+    )
+    const calendarEvents = await fetchLmsCalendar().catch(() => [] as LmsCalendarEvent[])
+    const upcomingEvents = calendarEvents.filter((e: LmsCalendarEvent) => {
+      if (e.kind === 'deadline') return false
+      const start = new Date(e.startsAt)
+      return start >= now && start <= sevenDaysAhead
+    })
+
+    const parts: string[] = []
+    if (pendingTasks.length > 0) {
+      parts.push(
+        `${pendingTasks.length} pending ${pendingTasks.length === 1 ? 'assignment' : 'assignments'}`,
+      )
+    }
+    if (upcomingEvents.length > 0) {
+      parts.push(
+        `${upcomingEvents.length} upcoming ${upcomingEvents.length === 1 ? 'session' : 'sessions'} this week`,
+      )
+    }
+
+    const summaryText =
+      parts.length > 0
+        ? `You currently have ${parts.join(', ')} in LMS.`
+        : 'All caught up! You have no pending assignments or untaken quizzes right now.'
+
     return {
-      isLiveConnected: false,
-      pendingTasks: [],
+      isLiveConnected: true,
+      pendingTasks,
       openQuizzes: [],
-      upcomingEvents: [],
-      summaryText: 'Connect to the live LMS server to view your real-time assignments and quizzes.',
+      upcomingEvents,
+      summaryText,
     }
   }
 
-  const now = new Date()
   const rawModules = (await lmsAuthedRequest<RawApiModule[] | null>('/modules')) ?? []
   const sortedModules = sortApiModules(rawModules)
   const openModules = sortedModules.filter((m) => !m.opens_at || new Date(m.opens_at) <= now)
@@ -1276,7 +1325,6 @@ export async function fetchLiveStudentReminders(): Promise<LmsStudentRemindersDa
   const pendingTasks = liveTasks.filter((t) => t.status === 'open' || t.status === 'overdue')
   const openQuizzes = quizzesPerModule.flat()
 
-  const sevenDaysAhead = new Date(now.getTime() + 7 * 86_400_000)
   const upcomingEvents: LmsCalendarEvent[] = (rawEvents ?? [])
     .filter((e) => {
       const start = new Date(e.starts_at)

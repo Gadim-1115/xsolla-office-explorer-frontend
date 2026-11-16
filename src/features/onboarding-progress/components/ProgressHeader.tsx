@@ -20,7 +20,16 @@ import { StudentReminderButton } from './StudentReminderButton'
 import { XsollaLogo } from '../../../shared/ui/XsollaLogo'
 
 export function ProgressHeader() {
-  const { zones, progress, notify, refreshMap, openRoomModal, openQuestModal } = useExplorer()
+  const {
+    zones,
+    progress,
+    selectedRoomZoneId,
+    notify,
+    refreshMap,
+    openRoomModal,
+    closeRoomModal,
+    openQuestModal,
+  } = useExplorer()
   const headerRef = useRef<HTMLElement>(null)
   const [lmsUser, setLmsUser] = useState<LmsUser | null>(() => {
     captureLmsSessionFromUrl()
@@ -85,7 +94,9 @@ export function ProgressHeader() {
     clearLmsSession()
     setLmsUser(null)
     setStreakStatus(null)
-    notify('success', 'Signed Out of LMS', 'Opening LMS tasks, grades, or calendar now requires LMS sign-in.')
+    closeRoomModal()
+    void refreshMap()
+    notify('success', 'Signed Out of LMS', 'Session reset to guest mode and locked zones restored.')
   }
 
   const handleStreakClick = () => {
@@ -110,18 +121,11 @@ export function ProgressHeader() {
           <XsollaLogo className="h-6 shrink-0 text-white sm:h-7" />
           <span className="h-5 w-[1px] shrink-0 bg-[#2F4045]" />
           <span className="font-display truncate text-xs font-bold text-white">
-            <span className="hidden sm:inline">School Baku · </span>31st Floor Explorer
+            Xsolla Office
           </span>
         </div>
 
-        <div className="order-3 grid w-full grid-cols-3 gap-2 xl:order-2 xl:w-auto xl:max-w-3xl xl:flex-1 xl:grid-cols-4">
-          <div className={`${tileClass} hidden border-[#2F4045] bg-[#233134] xl:block`}>
-            <p className={labelClass}>Xsolla</p>
-            <p className="mt-0.5 text-xs font-semibold text-white truncate">
-              All the things to launch, grow, and win
-            </p>
-          </div>
-
+        <div className="order-3 grid w-full grid-cols-3 gap-2 xl:order-2 xl:w-auto xl:max-w-2xl xl:flex-1">
           <div className={`${tileClass} relative overflow-hidden border-[#80EAFF]/40 bg-[#153640]`}>
             <div
               className="absolute top-0 left-0 h-[3px] bg-[#80EAFF] transition-all duration-500"
@@ -162,7 +166,7 @@ export function ProgressHeader() {
         <div className="order-2 ml-auto flex shrink-0 items-center gap-2 xl:order-3 xl:ml-0">
           {lmsUser ? (
             <>
-              <StudentReminderButton user={lmsUser} />
+              {!selectedRoomZoneId && <StudentReminderButton user={lmsUser} />}
 
               <button
                 type="button"
@@ -236,12 +240,11 @@ export function ProgressHeader() {
           <button
             type="button"
             onClick={handleResetDemoUser}
-            title="Start fresh student session"
+            title="Reset Session"
             aria-label="Reset Session"
-            className="flex shrink-0 items-center gap-1.5 rounded-[6px] border border-[#80EAFF]/30 bg-[#145B6D] px-2.5 py-2 text-xs font-semibold text-[#80EAFF] hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer sm:px-3.5"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-[#80EAFF]/30 bg-[#145B6D] text-[#80EAFF] hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
           >
             <RotateCcw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Reset Session</span>
           </button>
         </div>
       </div>
