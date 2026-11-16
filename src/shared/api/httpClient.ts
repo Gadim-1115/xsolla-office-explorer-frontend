@@ -1,11 +1,12 @@
 import type { APIEnvelope } from '../types/api.types'
+import { runtimeEnv } from '../config/runtime'
 import {
   captureLmsSessionFromUrl,
   getLmsUser,
   syncExplorerUuidWithLmsUser,
 } from './lmsClient'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+const API_BASE_URL = runtimeEnv('VITE_API_BASE_URL') || '/api/v1'
 const STORAGE_USER_ID_KEY = 'xsolla_explorer_student_id'
 const LMS_UUID_PREFIX = '00000000-0000-0000-'
 

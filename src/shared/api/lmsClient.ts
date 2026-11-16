@@ -1,3 +1,5 @@
+import { runtimeEnv } from '../config/runtime'
+
 export type LmsRole = 'student' | 'mentor' | 'lecturer' | 'admin'
 
 export interface LmsUser {
@@ -261,7 +263,7 @@ export function clearLmsSession(): void {
 }
 
 export function getLmsOrigin(): string {
-  const envOrigin = (import.meta.env.VITE_LMS_APP_URL as string | undefined)?.trim()
+  const envOrigin = runtimeEnv('VITE_LMS_APP_URL')
   if (envOrigin) return envOrigin.replace(/\/+$/, '')
   try {
     const stored = localStorage.getItem(LMS_ORIGIN_KEY)
@@ -277,7 +279,7 @@ export function getLmsOrigin(): string {
 }
 
 export function getLmsApiUrl(): string {
-  const envApi = (import.meta.env.VITE_LMS_API_URL as string | undefined)?.trim()
+  const envApi = runtimeEnv('VITE_LMS_API_URL')
   if (envApi) return envApi.replace(/\/+$/, '')
   try {
     const stored = localStorage.getItem(LMS_API_URL_KEY)
