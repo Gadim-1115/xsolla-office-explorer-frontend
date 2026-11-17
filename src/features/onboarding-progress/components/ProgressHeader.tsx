@@ -7,6 +7,7 @@ import {
   Flame,
   LogIn,
   LogOut,
+  Menu,
   RotateCcw,
   Trophy,
   UserCheck,
@@ -47,8 +48,9 @@ export function ProgressHeader() {
     openGuideModal,
   } = useExplorer()
   const headerRef = useRef<HTMLElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const [progressOpen, setProgressOpen] = useState<boolean>(false)
-  const [actionsOpen, setActionsOpen] = useState<boolean>(false)
+  const [menuOpen, setMenuOpen] = useState<boolean>(false)
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState<boolean>(false)
   const [lmsUser, setLmsUser] = useState<LmsUser | null>(() => {
     captureLmsSessionFromUrl()
@@ -122,6 +124,24 @@ export function ProgressHeader() {
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleOutside)
+    window.addEventListener('keydown', handleEsc)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      window.removeEventListener('keydown', handleEsc)
+    }
+  }, [menuOpen])
 
   const handleResetDemoUser = async () => {
     await httpRequest('/explorer/reset', { method: 'POST' }).catch(() => undefined)
@@ -231,146 +251,160 @@ export function ProgressHeader() {
           )}
         </div>
 
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <div className={actionsOpen ? 'flex flex-wrap items-center justify-end gap-2' : 'hidden'}>
-            {lmsUser ? (
-              <>
-                {!selectedRoomZoneId && <StudentReminderButton user={lmsUser} />}
-
-                <button
-                  type="button"
-                  onClick={handleStreakClick}
-                  title={
-                    streakStatus?.solvedToday
-                      ? `${streakStatus.streak} Day Streak Active Today! Click to visit Daily Bug Hunt monitor.`
-                      : `Daily Streak Unlit (${streakStatus?.streak ?? 0} days). Click to solve today’s bug in Open Space 2!`
-                  }
-                  className={`flex h-9 shrink-0 items-center gap-1.5 rounded-[6px] border px-2.5 text-xs font-bold transition cursor-pointer ${
-                    streakStatus?.solvedToday
-                      ? 'border-amber-400/70 bg-amber-500/20 text-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.22)] hover:bg-amber-500/30'
-                      : 'border-[#2F4045] bg-[#1D2A2D] text-[#7D9196] hover:border-[#80EAFF]/50 hover:text-white'
-                  }`}
-                >
-                  <Flame
-                    className={`h-4 w-4 transition-all ${
-                      streakStatus?.solvedToday
-                        ? 'fill-amber-400 text-orange-400 drop-shadow-[0_0_5px_rgba(251,146,60,0.85)]'
-                        : 'text-[#5A6E73] opacity-55'
-                    }`}
-                  />
-                  <span>{streakStatus?.streak ?? 0}</span>
-                </button>
-              </>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => setIsLeaderboardOpen(true)}
-              title="Open Top 10 Streak Leaderboard"
-              aria-label="Open Top 10 Streak Leaderboard"
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-[6px] border border-amber-400/40 bg-[#23251D] px-2.5 text-xs font-semibold text-amber-300 hover:border-amber-400 hover:bg-amber-500/20 transition cursor-pointer"
-            >
-              <Trophy className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Leaderboard</span>
-            </button>
-
-            {lmsUser ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => redirectToLmsApp()}
-                  title="Return to Xsolla School LMS"
-                  className="flex shrink-0 items-center gap-1.5 rounded-[6px] border border-[#80EAFF]/40 bg-[#153640] px-2.5 py-2 text-xs font-semibold text-[#80EAFF] hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer sm:px-3"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  <span>Back to LMS</span>
-                </button>
-                <div className="flex items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#233134] px-2.5 py-1.5 text-xs text-white">
-                  {streakStatus?.avatarUrl || lmsUser.avatarUrl ? (
-                    <img
-                      src={streakStatus?.avatarUrl || lmsUser.avatarUrl || ''}
-                      alt={lmsUser.name}
-                      className="h-5 w-5 rounded-full object-cover border border-[#80EAFF]/50"
-                    />
-                  ) : (
-                    <UserCheck className="h-3.5 w-3.5 text-[#80EAFF]" />
-                  )}
-                  <span className="font-semibold">{lmsUser.name}</span>
-                  <span className="rounded bg-[#153640] px-1.5 py-0.5 text-[10px] font-bold text-[#80EAFF]">
-                    {getLmsRoleLabel(lmsUser)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleLmsSignOut}
-                    title="Sign out of LMS session"
-                    className="ml-1 rounded p-0.5 text-[#9DB0B4] hover:bg-[#2F4045] hover:text-white transition cursor-pointer"
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </>
-            ) : (
+        <div className="ml-auto flex items-center gap-2">
+          {lmsUser ? (
+            <div className="flex items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#233134] px-2.5 py-1.5 text-xs text-white">
+              {streakStatus?.avatarUrl || lmsUser.avatarUrl ? (
+                <img
+                  src={streakStatus?.avatarUrl || lmsUser.avatarUrl || ''}
+                  alt={lmsUser.name}
+                  className="h-5 w-5 rounded-full object-cover border border-[#80EAFF]/50"
+                />
+              ) : (
+                <UserCheck className="h-3.5 w-3.5 text-[#80EAFF]" />
+              )}
+              <span className="max-w-[130px] truncate font-semibold sm:max-w-none">
+                {lmsUser.name}
+              </span>
+              <span className="rounded bg-[#153640] px-1.5 py-0.5 text-[10px] font-bold text-[#80EAFF]">
+                {getLmsRoleLabel(lmsUser)}
+              </span>
               <button
                 type="button"
-                onClick={() => redirectToLmsLogin()}
-                title="Sign in with Xsolla School LMS"
-                className="flex shrink-0 items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#233134] px-2.5 py-2 text-xs font-semibold text-white hover:border-[#80EAFF] hover:text-[#80EAFF] transition cursor-pointer sm:px-3"
+                onClick={handleLmsSignOut}
+                title="Sign out of LMS session"
+                className="ml-1 rounded p-0.5 text-[#9DB0B4] hover:bg-[#2F4045] hover:text-white transition cursor-pointer"
               >
-                <LogIn className="h-3.5 w-3.5 text-[#80EAFF]" />
-                <span>LMS Sign In</span>
+                <LogOut className="h-3.5 w-3.5" />
               </button>
-            )}
-
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={openGuideModal}
-              title="Onboarding Guide & Examples"
-              aria-label="Onboarding Guide & Examples"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-[#2F4045] bg-[#233134] text-[#9DB0B4] hover:border-[#80EAFF] hover:text-[#80EAFF] transition cursor-pointer"
+              onClick={() => redirectToLmsLogin()}
+              title="Sign in with Xsolla School LMS"
+              className="flex shrink-0 items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#233134] px-2.5 py-1.5 text-xs font-semibold text-white hover:border-[#80EAFF] hover:text-[#80EAFF] transition cursor-pointer sm:px-3"
             >
-              <BookOpen className="h-3.5 w-3.5" />
+              <LogIn className="h-3.5 w-3.5 text-[#80EAFF]" />
+              <span>LMS Sign In</span>
             </button>
+          )}
 
+          <div ref={menuRef} className="relative">
             <button
               type="button"
-              onClick={handleResetDemoUser}
-              title="Reset Session"
-              aria-label="Reset Session"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-[#80EAFF]/30 bg-[#145B6D] text-[#80EAFF] hover:bg-[#80EAFF] hover:text-[#0D1A1D] transition cursor-pointer"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              title={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] border transition cursor-pointer ${
+                menuOpen
+                  ? 'border-[#80EAFF] bg-[#153640] text-[#80EAFF]'
+                  : 'border-[#2F4045] bg-[#1B2628] text-white hover:border-[#80EAFF]/60 hover:text-[#80EAFF]'
+              }`}
             >
-              <RotateCcw className="h-3.5 w-3.5" />
+              <Menu className="h-4 w-4" />
             </button>
-          </div>
 
-          <button
-            type="button"
-            onClick={() => setActionsOpen((prev) => !prev)}
-            title={actionsOpen ? 'Collapse menu' : 'Expand account & tools menu'}
-            aria-label={actionsOpen ? 'Collapse menu' : 'Expand account & tools menu'}
-            className="flex h-8 items-center gap-1.5 rounded-[6px] border border-[#2F4045] bg-[#1B2628] px-2.5 text-xs font-semibold text-white hover:border-[#80EAFF]/60 hover:text-[#80EAFF] transition cursor-pointer"
-          >
-            {actionsOpen ? (
-              <ChevronRight className="h-4 w-4 text-[#80EAFF]" />
-            ) : (
-              <>
-                <ChevronLeft className="h-4 w-4 text-[#80EAFF]" />
-                {lmsUser ? (
-                  streakStatus?.avatarUrl || lmsUser.avatarUrl ? (
-                    <img
-                      src={streakStatus?.avatarUrl || lmsUser.avatarUrl || ''}
-                      alt={lmsUser.name}
-                      className="h-4 w-4 rounded-full object-cover border border-[#80EAFF]/50"
+            <div
+              className={
+                menuOpen
+                  ? 'absolute right-0 top-full mt-2 z-50 w-60 rounded-xl border border-[#2F4045] bg-[#141E20] p-2 shadow-[0_18px_48px_rgba(0,0,0,0.6)] flex flex-col gap-1'
+                  : 'hidden'
+              }
+            >
+              {lmsUser && !selectedRoomZoneId && (
+                <StudentReminderButton
+                  user={lmsUser}
+                  variant="menu-item"
+                  onOpenModal={() => setMenuOpen(false)}
+                />
+              )}
+
+              {lmsUser && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    handleStreakClick()
+                  }}
+                  className="flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-[#D6E3E6] hover:bg-[#1B2628] hover:text-white transition cursor-pointer"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Flame
+                      className={`h-4 w-4 ${
+                        streakStatus?.solvedToday
+                          ? 'fill-amber-400 text-orange-400'
+                          : 'text-[#6A7F84]'
+                      }`}
                     />
-                  ) : (
-                    <UserCheck className="h-3.5 w-3.5 text-[#80EAFF]" />
-                  )
-                ) : null}
-                <span className="text-[11px] font-semibold text-[#9DB0B4]">
-                  {lmsUser ? lmsUser.name.split(' ')[0] : 'Menu'}
-                </span>
-              </>
-            )}
-          </button>
+                    <span>Daily Streak</span>
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                      streakStatus?.solvedToday
+                        ? 'bg-amber-500/20 text-amber-300'
+                        : 'bg-[#233134] text-[#9DB0B4]'
+                    }`}
+                  >
+                    {streakStatus?.streak ?? 0}
+                  </span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setIsLeaderboardOpen(true)
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-500/15 transition cursor-pointer"
+              >
+                <Trophy className="h-4 w-4 shrink-0" />
+                <span>Leaderboard</span>
+              </button>
+
+              {lmsUser && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    redirectToLmsApp()
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-[#80EAFF] hover:bg-[#153640] transition cursor-pointer"
+                >
+                  <ArrowLeft className="h-4 w-4 shrink-0" />
+                  <span>Back to LMS</span>
+                </button>
+              )}
+
+              <div className="my-1 h-px bg-[#2F4045]" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  openGuideModal()
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-[#D6E3E6] hover:bg-[#1B2628] hover:text-[#80EAFF] transition cursor-pointer"
+              >
+                <BookOpen className="h-4 w-4 shrink-0 text-[#80EAFF]" />
+                <span>Quick Guide</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  void handleResetDemoUser()
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-[#D6E3E6] hover:bg-[#1B2628] hover:text-[#80EAFF] transition cursor-pointer"
+              >
+                <RotateCcw className="h-4 w-4 shrink-0 text-[#80EAFF]" />
+                <span>Reset Session</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

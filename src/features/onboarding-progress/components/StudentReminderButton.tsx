@@ -23,6 +23,8 @@ import {
 
 interface StudentReminderButtonProps {
   user: LmsUser | null
+  variant?: 'icon' | 'menu-item'
+  onOpenModal?: () => void
 }
 
 function formatDueRemaining(isoDate?: string | null): {
@@ -58,7 +60,11 @@ function formatDueRemaining(isoDate?: string | null): {
   }
 }
 
-export function StudentReminderButton({ user }: StudentReminderButtonProps) {
+export function StudentReminderButton({
+  user,
+  variant = 'icon',
+  onOpenModal,
+}: StudentReminderButtonProps) {
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const [data, setData] = useState<LmsStudentRemindersData | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
@@ -98,31 +104,64 @@ export function StudentReminderButton({ user }: StudentReminderButtonProps) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          setIsOpen(true)
-          void loadReminders()
-        }}
-        title="Open Student LMS Reminders"
-        aria-label="Open Student LMS Reminders"
-        className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] border transition cursor-pointer ${
-          actionableCount > 0
-            ? 'border-rose-500/80 bg-rose-500/15 text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.28)] hover:bg-rose-500 hover:text-white'
-            : 'border-[#2F4045] bg-[#1D2A2D] text-[#9DB0B4] hover:border-[#80EAFF]/60 hover:text-[#80EAFF]'
-        }`}
-      >
-        {actionableCount > 0 ? (
-          <BellRing className="h-4 w-4 transition-transform group-hover:scale-110" />
-        ) : (
-          <Bell className="h-4 w-4 transition-transform group-hover:scale-110" />
-        )}
-        {actionableCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#141E20] bg-rose-500 px-1 text-[10px] font-extrabold leading-none text-white shadow-sm">
-            {actionableCount > 9 ? '9+' : actionableCount}
+      {variant === 'menu-item' ? (
+        <button
+          type="button"
+          onClick={() => {
+            onOpenModal?.()
+            setIsOpen(true)
+            void loadReminders()
+          }}
+          title="Open Student LMS Reminders"
+          aria-label="Open Student LMS Reminders"
+          className={`flex w-full items-center justify-between gap-2.5 rounded-lg border px-3 py-2 text-xs font-semibold transition cursor-pointer ${
+            actionableCount > 0
+              ? 'border-rose-500/50 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+              : 'border-transparent bg-transparent text-[#D6E3E6] hover:bg-[#1B2628] hover:text-[#80EAFF]'
+          }`}
+        >
+          <span className="flex items-center gap-2.5">
+            {actionableCount > 0 ? (
+              <BellRing className="h-4 w-4 text-rose-400" />
+            ) : (
+              <Bell className="h-4 w-4 text-[#80EAFF]" />
+            )}
+            <span>Notifications</span>
           </span>
-        )}
-      </button>
+          {actionableCount > 0 && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-extrabold text-white">
+              {actionableCount > 9 ? '9+' : actionableCount}
+            </span>
+          )}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            onOpenModal?.()
+            setIsOpen(true)
+            void loadReminders()
+          }}
+          title="Open Student LMS Reminders"
+          aria-label="Open Student LMS Reminders"
+          className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] border transition cursor-pointer ${
+            actionableCount > 0
+              ? 'border-rose-500/80 bg-rose-500/15 text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.28)] hover:bg-rose-500 hover:text-white'
+              : 'border-[#2F4045] bg-[#1D2A2D] text-[#9DB0B4] hover:border-[#80EAFF]/60 hover:text-[#80EAFF]'
+          }`}
+        >
+          {actionableCount > 0 ? (
+            <BellRing className="h-4 w-4 transition-transform group-hover:scale-110" />
+          ) : (
+            <Bell className="h-4 w-4 transition-transform group-hover:scale-110" />
+          )}
+          {actionableCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#141E20] bg-rose-500 px-1 text-[10px] font-extrabold leading-none text-white shadow-sm">
+              {actionableCount > 9 ? '9+' : actionableCount}
+            </span>
+          )}
+        </button>
+      )}
 
       {isOpen &&
         createPortal(
