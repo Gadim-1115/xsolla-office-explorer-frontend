@@ -175,7 +175,7 @@ export function ProgressHeader() {
   return (
     <header
       ref={headerRef}
-      className="w-full border-b border-[#2F4045] bg-[#141E20] px-4 py-2 sm:px-6 sm:py-2.5 z-30"
+      className="relative w-full border-b border-[#2F4045] bg-[#141E20] px-4 py-2 sm:px-6 sm:py-2.5 z-50"
     >
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2.5 sm:gap-3">
